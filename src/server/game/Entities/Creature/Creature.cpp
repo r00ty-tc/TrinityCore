@@ -252,11 +252,6 @@ void Creature::RemoveCorpse(bool setSpawnTime)
     GetRespawnPosition(x, y, z, &o);
     SetHomePosition(x, y, z, o);
     GetMap()->CreatureRelocation(this, x, y, z, o);
-
-    // If corpse was just removed, and the creature pool is below minimum
-    // Make a respawn now
-    if (sPoolMgr->NeedExpeditedRespawn(GetGUIDLow()))
-        Respawn();
 }
 
 /**
@@ -1503,11 +1498,6 @@ void Creature::setDeathState(DeathState s)
 
         if ((CanFly() || IsFlying()))
             GetMotionMaster()->MoveFall();
-
-        // Pool function to handle creature death
-        // Mainly checks if there is a need to expedite a despawn/respawn
-        // when pool drops below minumum threshold
-        sPoolMgr->HandleCreatureDeath(GetGUIDLow());
 
         Unit::setDeathState(CORPSE);
     }

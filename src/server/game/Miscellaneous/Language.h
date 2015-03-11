@@ -1200,7 +1200,6 @@ enum TrinityStrings
     LANG_BAN_ACCOUNT_YOUPERMBANNEDMESSAGE_WORLD   = 11007,
 
     LANG_NPCINFO_INHABIT_TYPE                     = 11008,
-    LANG_NPCINFO_FLAGS_EXTRA                      = 11009,
-    LANG_NPCINFO_POOLINFO                         = 20078
+    LANG_NPCINFO_FLAGS_EXTRA                      = 11009
 };
 #endif
