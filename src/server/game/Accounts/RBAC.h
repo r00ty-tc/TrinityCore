@@ -757,6 +757,11 @@ enum RBACPermissions
     RBAC_PERM_COMMAND_RELOAD_SCENE_TEMPLATE                  = 850, // not on 3.3.5a
     RBAC_PERM_COMMAND_RELOAD_AREATRIGGER_TEMPLATE            = 851, // not on 3.3.5a
     RBAC_PERM_COMMAND_GO_OFFSET                              = 852,
+    RBAC_PERM_COMMAND_NPC_SPAWNGROUP                         = 853,
+    RBAC_PERM_COMMAND_NPC_DESPAWNGROUP                       = 854,
+    RBAC_PERM_COMMAND_GOBJECT_SPAWNGROUP                     = 855,
+    RBAC_PERM_COMMAND_GOBJECT_DESPAWNGROUP                   = 856,
+    RBAC_PERM_COMMAND_LIST_RESPAWNS                          = 857,
 
     // custom permissions 1000+
     RBAC_PERM_MAX
