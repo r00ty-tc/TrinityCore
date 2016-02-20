@@ -1177,6 +1177,12 @@ void World::LoadConfigSettings(bool reload)
 
     m_bool_configs[CONFIG_ENABLE_MMAPS] = sConfigMgr->GetBoolDefault("mmap.enablePathFinding", false);
     TC_LOG_INFO("server.loading", "WORLD: MMap data directory is: %smmaps", m_dataPath.c_str());
+    m_int_configs[CONFIG_MMAP_HEIGHT_VALIDATION] = sConfigMgr->GetIntDefault("mmap.useForHeightValidation", 1);
+    if (m_int_configs[CONFIG_MMAP_HEIGHT_VALIDATION] > 2)
+    {
+        TC_LOG_ERROR("server.loading", "mmap.useForHeightValidation invalid value specified, using default of 1");
+        m_int_configs[CONFIG_MMAP_HEIGHT_VALIDATION] = 1;
+    }
 
     m_bool_configs[CONFIG_VMAP_INDOOR_CHECK] = sConfigMgr->GetBoolDefault("vmap.enableIndoorCheck", 0);
     bool enableIndoor = sConfigMgr->GetBoolDefault("vmap.enableIndoorCheck", true);

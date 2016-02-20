@@ -70,28 +70,15 @@ void RandomMovementGenerator<Creature>::_setRandomLocation(Creature* creature)
     //else if (is_water_ok)                                 // 3D system under water and above ground (swimming mode)
     else                                                    // 2D only
     {
-        // 10.0 is the max that vmap high can check (MAX_CAN_FALL_DISTANCE)
-        travelDistZ = travelDistZ >= 10.0f ? 10.0f : travelDistZ;
+        // Get the mmap floor if present, as a good start
+        Position sPos(destX, destY, respZ);
+        Position mmapPos(0.0f, 0.0f, 0.0f);
+        if (creature->GetMap()->GetMMapPosition(sPos, mmapPos))
+            if (mmapPos.GetPositionZ() > respZ)
+                respZ = mmapPos.GetPositionZ();
 
-        // The fastest way to get an accurate result 90% of the time.
-        // Better result can be obtained like 99% accuracy with a ray light, but the cost is too high and the code is too long.
-        destZ = map->GetHeight(creature->GetPhaseMask(), destX, destY, respZ+travelDistZ-2.0f, false);
-
-        if (std::fabs(destZ - respZ) > travelDistZ)              // Map check
-        {
-            // Vmap Horizontal or above
-            destZ = map->GetHeight(creature->GetPhaseMask(), destX, destY, respZ - 2.0f, true);
-
-            if (std::fabs(destZ - respZ) > travelDistZ)
-            {
-                // Vmap Higher
-                destZ = map->GetHeight(creature->GetPhaseMask(), destX, destY, respZ+travelDistZ-2.0f, true);
-
-                // let's forget this bad coords where a z cannot be find and retry at next tick
-                if (std::fabs(destZ - respZ) > travelDistZ)
-                    return;
-            }
-        }
+        // We use a ray, deal with it.
+        destZ = map->GetHeight(creature->GetPhaseMask(), destX, destY, respZ + 2.0f, true, 50.0f);
     }
 
     if (is_air_ok)
@@ -107,6 +94,7 @@ void RandomMovementGenerator<Creature>::_setRandomLocation(Creature* creature)
     creature->AddUnitState(UNIT_STATE_ROAMING_MOVE);
 
     Movement::MoveSplineInit init(creature);
+    creature->UpdateAllowedPositionZ(destX, destY, destZ, true);
     init.MoveTo(destX, destY, destZ);
     init.SetWalk(true);
     init.Launch();

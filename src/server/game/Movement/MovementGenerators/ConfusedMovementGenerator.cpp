@@ -81,6 +81,13 @@ bool ConfusedMovementGenerator<T>::DoUpdate(T* unit, uint32 diff)
 
             Position pos;
             pos.Relocate(i_x, i_y, i_z);
+            Position mmapPos(0.0f, 0.0f, 0.0f);
+
+            // See if we can get a good starting Z for path end point from map
+            if (unit->GetMap()->GetMMapPosition(pos, mmapPos))
+                if (mmapPos.GetPositionZ() > pos.GetPositionZ())
+                pos.m_positionZ = mmapPos.GetPositionZ();
+
             unit->MovePositionToFirstCollision(pos, dest, 0.0f);
 
             PathGenerator path(unit);

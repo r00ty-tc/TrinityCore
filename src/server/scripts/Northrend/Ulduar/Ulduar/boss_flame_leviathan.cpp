@@ -773,6 +773,12 @@ class boss_flame_leviathan_safety_container : public CreatureScript
             {
                 float x, y, z;
                 me->GetPosition(x, y, z);
+
+                Position mmapPos(0.0f, 0.0f, 0.0f);
+                if (me->GetMap()->GetMMapPosition(me->GetPosition(), mmapPos, me))
+                    if (mmapPos.GetPositionZ() > z)
+                        z = mmapPos.GetPositionZ();
+
                 z = me->GetMap()->GetHeight(me->GetPhaseMask(), x, y, z);
                 me->GetMotionMaster()->MovePoint(0, x, y, z);
                 me->SetPosition(x, y, z, 0);

@@ -129,7 +129,11 @@ void Map::LoadMMap(int gx, int gy)
     bool mmapLoadResult = MMAP::MMapFactory::createOrGetMMapManager()->loadMap((sWorld->GetDataPath() + "mmaps").c_str(), GetId(), gx, gy);
 
     if (mmapLoadResult)
+    {
         TC_LOG_DEBUG("maps", "MMAP loaded name:%s, id:%d, x:%d, y:%d (mmap rep.: x:%d, y:%d)", GetMapName(), GetId(), gx, gy, gx, gy);
+        m_navmesh = MMAP::MMapFactory::createOrGetMMapManager()->GetNavMesh(GetId());
+        m_navmeshquery = MMAP::MMapFactory::createOrGetMMapManager()->GetNavMeshQuery(GetId(), GetInstanceId());
+    }
     else
         TC_LOG_ERROR("maps", "Could not load MMAP name:%s, id:%d, x:%d, y:%d (mmap rep.: x:%d, y:%d)", GetMapName(), GetId(), gx, gy, gx, gy);
 }
@@ -2282,12 +2286,12 @@ inline GridMap* Map::GetGrid(float x, float y)
     return GridMaps[gx][gy];
 }
 
-float Map::GetWaterOrGroundLevel(float x, float y, float z, float* ground /*= NULL*/, bool /*swim = false*/) const
+float Map::GetWaterOrGroundLevel(float x, float y, float z, float* ground /*= NULL*/, bool /*swim = false*/, float maxZOverride) const
 {
     if (const_cast<Map*>(this)->GetGrid(x, y))
     {
         // we need ground level (including grid height version) for proper return water level in point
-        float ground_z = GetHeight(PHASEMASK_NORMAL, x, y, z, true, 50.0f);
+        float ground_z = GetHeight(PHASEMASK_NORMAL, x, y, z, true, 50.0f, maxZOverride);
         if (ground)
             *ground = ground_z;
 
@@ -2308,7 +2312,7 @@ float Map::GetHeight(float x, float y, float z, bool checkVMap /*= true*/, float
     {
         float gridHeight = gmap->getHeight(x, y);
         // look from a bit higher pos to find the floor, ignore under surface case
-        if (z + 2.0f > gridHeight)
+        if (z + MAP_SEARCH_DISTANCE_Z > gridHeight)
             mapHeight = gridHeight;
     }
 
@@ -2317,20 +2321,21 @@ float Map::GetHeight(float x, float y, float z, bool checkVMap /*= true*/, float
     {
         VMAP::IVMapManager* vmgr = VMAP::VMapFactory::createOrGetVMapManager();
         if (vmgr->isHeightCalcEnabled())
-            vmapHeight = vmgr->getHeight(GetId(), x, y, z + 2.0f, maxSearchDist);   // look from a bit higher pos to find the floor
+            vmapHeight = vmgr->getHeight(GetId(), x, y, z, maxSearchDist);   // look from a bit higher pos to find the floor
     }
 
     // mapHeight set for any above raw ground Z or <= INVALID_HEIGHT
     // vmapheight set for any under Z value or <= INVALID_HEIGHT
-    if (vmapHeight > INVALID_HEIGHT)
+    float minHeight = GetMinHeight(x, y);
+    if (vmapHeight > minHeight)
     {
-        if (mapHeight > INVALID_HEIGHT)
+        if (mapHeight > minHeight)
         {
             // we have mapheight and vmapheight and must select more appropriate
 
-            // we are already under the surface or vmap height above map heigt
+            // we are already under the surface or vmap height above map heigt (removed, makes no sense)
             // or if the distance of the vmap height is less the land height distance
-            if (z < mapHeight || vmapHeight > mapHeight || std::fabs(mapHeight - z) > std::fabs(vmapHeight - z))
+            if (vmapHeight > mapHeight || std::fabs(mapHeight - z) > std::fabs(vmapHeight - z))
                 return vmapHeight;
             else
                 return mapHeight;                           // better use .map surface height
@@ -2404,7 +2409,7 @@ bool Map::GetAreaInfo(float x, float y, float z, uint32 &flags, int32 &adtId, in
         {
             float _mapheight = gmap->getHeight(x, y);
             // z + 2.0f condition taken from GetHeight(), not sure if it's such a great choice...
-            if (z + 2.0f > _mapheight &&  _mapheight > vmap_z)
+            if (z + MAP_SEARCH_DISTANCE_Z > _mapheight &&  _mapheight > vmap_z)
                 return false;
         }
         return true;
@@ -2596,9 +2601,9 @@ bool Map::getObjectHitPos(uint32 phasemask, float x1, float y1, float z1, float 
     return result;
 }
 
-float Map::GetHeight(uint32 phasemask, float x, float y, float z, bool vmap/*=true*/, float maxSearchDist/*=DEFAULT_HEIGHT_SEARCH*/) const
+float Map::GetHeight(uint32 phasemask, float x, float y, float z, bool vmap/*=true*/, float maxSearchDist/*=DEFAULT_HEIGHT_SEARCH*/, float maxZOverride) const
 {
-    return std::max<float>(GetHeight(x, y, z, vmap, maxSearchDist), _dynamicTree.getHeight(x, y, z, maxSearchDist, phasemask));
+    return std::max<float>(GetHeight(x, y, z + maxZOverride, vmap, maxSearchDist), _dynamicTree.getHeight(x, y, z + maxZOverride, maxSearchDist, phasemask));
 }
 
 bool Map::IsInWater(float x, float y, float pZ, LiquidData* data) const
@@ -3901,4 +3906,50 @@ void Map::UpdateAreaDependentAuras()
                 player->UpdateAreaDependentAuras(player->GetAreaId());
                 player->UpdateZoneDependentAuras(player->GetZoneId());
             }
+}
+
+bool Map::GetMMapPosition(const Position& pos, Position& mmapPos, const Unit* targetUnit)
+{
+    if (sWorld->getIntConfig(CONFIG_MMAP_HEIGHT_VALIDATION) == 0 || !DisableMgr::IsPathfindingEnabled(GetId()) || !m_navmesh || !m_navmeshquery)
+        return false;
+
+    // Path mode (more CPU)
+    if (sWorld->getIntConfig(CONFIG_MMAP_HEIGHT_VALIDATION) == 2 && targetUnit)
+    {
+        PathGenerator path(targetUnit);
+        path.SetUseStraightPath(false);
+        bool result = path.CalculatePath(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), false, false);
+
+        if (result)
+        {
+            G3D::Vector3 const &actualEnd = path.GetActualEndPosition();
+            if (G3D::fuzzyNe(actualEnd.x, 0.0f) || G3D::fuzzyNe(actualEnd.y, 0.0f) || G3D::fuzzyNe(actualEnd.z, 0.0f))
+            {
+                if (actualEnd.z > pos.GetPositionZ())
+                {
+                    mmapPos.m_positionX = actualEnd.x;
+                    mmapPos.m_positionY = actualEnd.y;
+                    mmapPos.m_positionZ = actualEnd.z;
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Point mode only (no path, faster)
+    float location[VERTEX_SIZE] = { pos.GetPositionY(), pos.GetPositionZ(), pos.GetPositionX() };
+    float extents[VERTEX_SIZE] = { 3.0f, 5.0f, 3.0f };
+    float nearPos[VERTEX_SIZE] = { 0.0f, 0.0f, 0.0f };
+
+    dtQueryFilter filter = dtQueryFilter();
+    dtPolyRef polyRef = INVALID_POLYREF;
+    dtStatus stat = m_navmeshquery->findNearestPoly(location, extents, &filter, &polyRef, nearPos);
+    if (dtStatusFailed(stat))
+        return false;
+
+    if (G3D::fuzzyEq(nearPos[2], 0.0f) && G3D::fuzzyEq(nearPos[1], 0.0f) && G3D::fuzzyEq(nearPos[0], 0.0f))
+        return false;
+
+    mmapPos.Relocate(nearPos[2], nearPos[0], nearPos[1]);
+    return true;
 }

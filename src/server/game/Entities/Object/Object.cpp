@@ -1386,12 +1386,19 @@ Position WorldObject::GetRandomPoint(const Position &srcPos, float distance) con
 
 void WorldObject::UpdateGroundPositionZ(float x, float y, float &z) const
 {
-    float new_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z + 2.0f, true);
+    Position pos(x, y, z);
+    Position mmapPos(0.0f, 0.0f, 0.0f);
+
+    if (GetMap()->GetMMapPosition(pos, mmapPos))
+        if (mmapPos.GetPositionZ() > z)
+            z = mmapPos.GetPositionZ();
+
+    float new_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z + MAP_SEARCH_DISTANCE_Z, true);
     if (new_z > INVALID_HEIGHT)
         z = new_z + 0.05f;                                   // just to be sure that we are not a few pixel under the surface
 }
 
-void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z) const
+void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z, bool validateLastPosition, const Position* lastPos) const
 {
     // TODO: Allow transports to be part of dynamic vmap tree
     if (GetTransport())
@@ -1407,20 +1414,75 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z) const
             {
                 bool canSwim = ToCreature()->CanSwim();
                 float ground_z = z;
-                float max_z = canSwim
-                    ? GetMap()->GetWaterOrGroundLevel(x, y, z, &ground_z, !ToUnit()->HasAuraType(SPELL_AURA_WATER_WALK))
-                    : ((ground_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z, true)));
-                if (max_z > INVALID_HEIGHT)
+
+                float dist = (lastPos) ? lastPos->GetExactDist2d(x, y) : ToCreature()->GetExactDist2d(x, y);
+                validateLastPosition = (validateLastPosition && dist > 0.0f);
+                float maxDelta = validateLastPosition ? tan(60.0f * 3.14159265f / 180.0f) * ((lastPos) ? lastPos->GetExactDist2d(x,y) : GetExactDist2d(x, y)) + 0.2f : 50.0f;
+
+                // Get the mmap floor if present, as a good start
+                const Position pos(x, y, z);
+                Position mmapPos(0.0f, 0.0f, 0.0f);
+
+                if (GetMap()->GetMMapPosition(pos, mmapPos))
+                    z = mmapPos.GetPositionZ();
+
+                float thisDelta = MAP_SEARCH_DISTANCE_Z;
+                float bestDiff = z + 50.0f;
+                float max_z = 0.0f;
+
+                if (mmapPos == Position(0.0f, 0.0f, 0.0f))
                 {
-                    if (z > max_z)
-                        z = max_z;
-                    else if (z < ground_z)
-                        z = ground_z;
+                    max_z = canSwim
+                        ? GetMap()->GetWaterOrGroundLevel(x, y, z, &ground_z, !ToUnit()->HasAuraType(SPELL_AURA_WATER_WALK), thisDelta)
+                        : ((ground_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z, true, 50.0f, thisDelta)));
+
+                    if (max_z > INVALID_HEIGHT)
+                    {
+                        if (z > max_z)
+                            z = max_z;
+                        else if (z < ground_z)
+                            z = ground_z;
+                    }
+                }
+                else
+                {
+                    // Try to find ground level closest to navmesh z
+                    for (thisDelta = -2.0f; thisDelta <= 8.0f; thisDelta += 2.0f)
+                    {
+                        max_z = canSwim
+                            ? GetMap()->GetWaterOrGroundLevel(x, y, z, &ground_z, !ToUnit()->HasAuraType(SPELL_AURA_WATER_WALK), thisDelta)
+                            : ((ground_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z, true, 50.0f, thisDelta)));
+
+                        if (max_z > INVALID_HEIGHT)
+                        {
+                            float thisZ = 50.0f;
+                            if (z > max_z)
+                                thisZ = max_z;
+                            else if (z < ground_z)
+                                thisZ = ground_z;
+
+                            if (fabs(z - thisZ) < 1.0f)
+                            {
+                                bestDiff = thisZ;
+                                break;
+                            }
+
+                            if (fabs(z - thisZ) < z - bestDiff)
+                                bestDiff = thisZ;
+
+                            else if (bestDiff < z + 50.0f)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    if (bestDiff < z + 50.0f)
+                        z = bestDiff;
                 }
             }
             else
             {
-                float ground_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z, true);
+                float ground_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z, true, 50.0f);
                 if (z < ground_z)
                     z = ground_z;
             }
@@ -1431,6 +1493,13 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z) const
             // for server controlled moves playr work same as creature (but it can always swim)
             if (!ToPlayer()->CanFly())
             {
+                // Get the mmap floor if present, as a good start
+                const Position pos(x, y, z);
+                Position mmapPos(0.0f, 0.0f, 0.0f);
+                if (GetMap()->GetMMapPosition(pos, mmapPos))
+                    if (mmapPos.GetPositionZ() > z)
+                        z = mmapPos.GetPositionZ();
+
                 float ground_z = z;
                 float max_z = GetMap()->GetWaterOrGroundLevel(x, y, z, &ground_z, !ToUnit()->HasAuraType(SPELL_AURA_WATER_WALK));
                 if (max_z > INVALID_HEIGHT)
@@ -2251,9 +2320,18 @@ void WorldObject::MovePosition(Position &pos, float dist, float angle)
         return;
     }
 
+    float z = pos.m_positionZ;
+
+    // Get the mmap floor if present, as a good start
+    Position sPos(destx, desty, z);
+    Position mmapPos(0.0f, 0.0f, 0.0f);
+    if (GetMap()->GetMMapPosition(sPos, mmapPos))
+        if (mmapPos.GetPositionZ() > z)
+            z = mmapPos.GetPositionZ();
+
     ground = GetMap()->GetHeight(GetPhaseMask(), destx, desty, MAX_HEIGHT, true);
-    floor = GetMap()->GetHeight(GetPhaseMask(), destx, desty, pos.m_positionZ, true);
-    destz = std::fabs(ground - pos.m_positionZ) <= std::fabs(floor - pos.m_positionZ) ? ground : floor;
+    floor = GetMap()->GetHeight(GetPhaseMask(), destx, desty, z, true);
+    destz = std::fabs(ground - pos.m_positionZ) <= std::fabs(floor - z) ? ground : floor;
 
     float step = dist/10.0f;
 
@@ -2264,6 +2342,12 @@ void WorldObject::MovePosition(Position &pos, float dist, float angle)
         {
             destx -= step * std::cos(angle);
             desty -= step * std::sin(angle);
+            z = pos.m_positionZ;
+            sPos = Position(destx, desty, z);
+            if (GetMap()->GetMMapPosition(sPos, mmapPos))
+                if (mmapPos.GetPositionZ() > z)
+                    z = mmapPos.GetPositionZ();
+
             ground = GetMap()->GetHeight(GetPhaseMask(), destx, desty, MAX_HEIGHT, true);
             floor = GetMap()->GetHeight(GetPhaseMask(), destx, desty, pos.m_positionZ, true);
             destz = std::fabs(ground - pos.m_positionZ) <= std::fabs(floor - pos.m_positionZ) ? ground : floor;
@@ -2285,8 +2369,16 @@ void WorldObject::MovePosition(Position &pos, float dist, float angle)
 // @todo: replace with WorldObject::UpdateAllowedPositionZ
 float NormalizeZforCollision(WorldObject* obj, float x, float y, float z)
 {
+    // Get the mmap floor if present, as a good start
+    Position pos(x, y, z);
+    Position mmapPos(0.0f, 0.0f, 0.0f);
+    if (obj->GetMap()->GetMMapPosition(pos, mmapPos))
+        if (mmapPos.GetPositionZ() > z)
+            z = mmapPos.GetPositionZ();
+
     float ground = obj->GetMap()->GetHeight(obj->GetPhaseMask(), x, y, MAX_HEIGHT, true);
-    float floor = obj->GetMap()->GetHeight(obj->GetPhaseMask(), x, y, z + 2.0f, true);
+
+    float floor = obj->GetMap()->GetHeight(obj->GetPhaseMask(), x, y, z, true);
     float helper = std::fabs(ground - z) <= std::fabs(floor - z) ? ground : floor;
     if (z > helper) // must be above ground
     {

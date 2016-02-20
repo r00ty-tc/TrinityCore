@@ -852,7 +852,14 @@ class boss_sara : public CreatureScript
                             float angle = frand(0.0f, 2.0f * float(M_PI));
                             pos.m_positionX = YoggSaronSpawnPos.GetPositionX() + radius * cosf(angle);
                             pos.m_positionY = YoggSaronSpawnPos.GetPositionY() + radius * sinf(angle);
-                            pos.m_positionZ = me->GetMap()->GetHeight(me->GetPhaseMask(), pos.GetPositionX(), pos.GetPositionY(), YoggSaronSpawnPos.GetPositionZ() + 5.0f);
+
+                            Position mmapPos(0.0f, 0.0f, 0.0f);
+                            float startZ = YoggSaronSpawnPos.GetPositionZ();
+                            if (me->GetMap()->GetMMapPosition(YoggSaronSpawnPos, mmapPos, me))
+                                if (mmapPos.GetPositionZ() > startZ)
+                                    startZ = mmapPos.GetPositionZ();
+
+                            pos.m_positionZ = me->GetMap()->GetHeight(me->GetPhaseMask(), pos.GetPositionX(), pos.GetPositionY(), startZ + 5.0f);
                             me->SummonCreature(NPC_DEATH_RAY, pos, TEMPSUMMON_TIMED_DESPAWN, 20000);
                         }
                         break;

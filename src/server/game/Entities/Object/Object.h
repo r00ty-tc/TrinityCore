@@ -446,7 +446,7 @@ class WorldObject : public Object, public WorldLocation
 
         float GetObjectSize() const;
         void UpdateGroundPositionZ(float x, float y, float &z) const;
-        void UpdateAllowedPositionZ(float x, float y, float &z) const;
+        void UpdateAllowedPositionZ(float x, float y, float &z, bool validateLastPosition = false, const Position* lastPos = nullptr) const;
 
         void GetRandomPoint(Position const &srcPos, float distance, float &rand_x, float &rand_y, float &rand_z) const;
         Position GetRandomPoint(Position const &srcPos, float distance) const;

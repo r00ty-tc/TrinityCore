@@ -210,6 +210,20 @@ public:
         float groundZ = map->GetHeight(object->GetPhaseMask(), object->GetPositionX(), object->GetPositionY(), MAX_HEIGHT);
         float floorZ = map->GetHeight(object->GetPhaseMask(), object->GetPositionX(), object->GetPositionY(), object->GetPositionZ());
 
+        // Some stuff to find out angle ahead
+        //const Position aheadPos = object->GetNearPosition(1.0f, object->GetOrientation());
+        //const float aheadZ = map->GetHeight(object->GetPhaseMask(), aheadPos.GetPositionX(), aheadPos.GetPositionY(), aheadPos.GetPositionZ()) - floorZ;
+        //const float aheadAngle = atan(1.0f / aheadZ);
+        //handler->PSendSysMessage("Ahead Z %f, angle %f radians (%f degrees)", aheadZ, aheadAngle, aheadAngle * 180.0f / 3.14159265f);
+
+        // Obtain closest position on navmesg poly 
+        // @ToDo make this LANNIFIED
+        Position nmPos(0.0f, 0.0f, 0.0f);
+        if (object->GetMap()->GetMMapPosition(object->GetPosition(), nmPos))
+            handler->PSendSysMessage("Navmesh location [%f, %f, %f]", nmPos.GetPositionX(), nmPos.GetPositionY(), nmPos.GetPositionZ());
+        else
+            handler->PSendSysMessage("No navmesh poly found");
+
         GridCoord gridCoord = Trinity::ComputeGridCoord(object->GetPositionX(), object->GetPositionY());
 
         int gridX = (MAX_NUMBER_OF_GRIDS - 1) - gridCoord.x_coord;

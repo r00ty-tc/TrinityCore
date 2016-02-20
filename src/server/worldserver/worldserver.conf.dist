@@ -299,6 +299,19 @@ PlayerSave.Stats.SaveOnlyOnLogout = 1
 mmap.enablePathFinding = 0
 
 #
+#    mmap.useForHeightValidation
+#        Description: Enable/Disable use of mmap navmesh to ascertain height values.
+#                     When enabled, the validation of the x/y/z position will be compared
+#                     against the nearest navmesh polygon and this will be used against the
+#                     map/vmap heights to eventually find the best floor position.
+#                     Point mode seems to work fine for almost all situations
+#         Default:    1 - Enabled (Point mode) - Checks the individual point for the nearest polygon
+#                     0 - Disabled - Use only map/vmap according to other configuration options
+#                     2 - Enabled (path mode) - Generates a path (where possible) from start location (NYI)
+
+mmap.useForHeightValidation = 1
+
+#
 #    vmap.enableLOS
 #    vmap.enableHeight
 #        Description: VMmap support for line of sight and height calculation.

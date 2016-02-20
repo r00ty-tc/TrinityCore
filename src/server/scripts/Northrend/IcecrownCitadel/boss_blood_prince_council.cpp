@@ -876,6 +876,13 @@ class boss_prince_valanar_icc : public CreatureScript
                     {
                         float x, y, z;
                         summon->GetPosition(x, y, z);
+
+                        Position pos(x, y, z);
+                        Position mmapPos;
+                        if (summon->GetMap()->GetMMapPosition(pos, mmapPos))
+                            if (mmapPos.GetPositionZ() > z)
+                                z = mmapPos.GetPositionZ();
+
                         float ground_Z = summon->GetMap()->GetHeight(summon->GetPhaseMask(), x, y, z, true, 500.0f);
                         summon->GetMotionMaster()->MovePoint(POINT_KINETIC_BOMB_IMPACT, x, y, ground_Z);
                         summon->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
@@ -1233,6 +1240,13 @@ class npc_kinetic_bomb : public CreatureScript
                 me->SetReactState(REACT_PASSIVE);
                 me->GetPosition(_x, _y, _groundZ);
                 me->DespawnOrUnsummon(60000);
+
+                Position pos(_x, _y, _groundZ);
+                Position mmapPos(0.0f, 0.0f, 0.0f);
+                if (me->GetMap()->GetMMapPosition(pos, mmapPos, me))
+                    if (mmapPos.GetPositionZ() > _groundZ)
+                        _groundZ = mmapPos.GetPositionZ();
+
                 _groundZ = me->GetMap()->GetHeight(me->GetPhaseMask(), _x, _y, _groundZ, true, 500.0f);
             }
 

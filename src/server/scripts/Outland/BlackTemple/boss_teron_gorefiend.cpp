@@ -458,6 +458,13 @@ public:
                     float X = CalculateRandomLocation(target->GetPositionX(), 20);
                     float Y = CalculateRandomLocation(target->GetPositionY(), 20);
                     float Z = target->GetPositionZ();
+
+                    Position pos(X, Y, Z);
+                    Position mmapPos(0.0f, 0.0f, 0.0f);
+                    if (me->GetMap()->GetMMapPosition(pos, mmapPos, target))
+                        if (mmapPos.GetPositionZ() > Z)
+                            Z = mmapPos.GetPositionZ();
+
                     Z = me->GetMap()->GetHeight(me->GetPhaseMask(), X, Y, Z);
                     Creature* DoomBlossom = me->SummonCreature(CREATURE_DOOM_BLOSSOM, X, Y, Z, 0, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 20000);
                     if (DoomBlossom)

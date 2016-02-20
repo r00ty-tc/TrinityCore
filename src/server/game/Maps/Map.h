@@ -55,6 +55,8 @@ class BattlegroundMap;
 class InstanceMap;
 class Transport;
 namespace Trinity { struct ObjectUpdater; }
+class dtNavMesh;
+class dtNavMeshQuery;
 
 struct ScriptAction
 {
@@ -248,6 +250,7 @@ struct ZoneDynamicInfo
 #define MAX_FALL_DISTANCE     250000.0f                     // "unlimited fall" to find VMap ground if it is available, just larger than MAX_HEIGHT - INVALID_HEIGHT
 #define DEFAULT_HEIGHT_SEARCH     50.0f                     // default search distance to find height at nearby locations
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
+#define MAP_SEARCH_DISTANCE_Z      2.0f
 
 typedef std::map<uint32/*leaderDBGUID*/, CreatureGroup*>        CreatureGroupHolderType;
 
@@ -491,8 +494,8 @@ class Map : public GridRefManager<NGridType>
         BattlegroundMap* ToBattlegroundMap() { if (IsBattlegroundOrArena()) return reinterpret_cast<BattlegroundMap*>(this); else return NULL;  }
         BattlegroundMap const* ToBattlegroundMap() const { if (IsBattlegroundOrArena()) return reinterpret_cast<BattlegroundMap const*>(this); return NULL; }
 
-        float GetWaterOrGroundLevel(float x, float y, float z, float* ground = NULL, bool swim = false) const;
-        float GetHeight(uint32 phasemask, float x, float y, float z, bool vmap = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH) const;
+        float GetWaterOrGroundLevel(float x, float y, float z, float* ground = NULL, bool swim = false, float maxZOverride = MAP_SEARCH_DISTANCE_Z) const;
+        float GetHeight(uint32 phasemask, float x, float y, float z, bool vmap = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH, float maxZOverride = MAP_SEARCH_DISTANCE_Z) const;
         bool isInLineOfSight(float x1, float y1, float z1, float x2, float y2, float z2, uint32 phasemask) const;
         void Balance() { _dynamicTree.balance(); }
         void RemoveGameObjectModel(const GameObjectModel& model) { _dynamicTree.remove(model); }
@@ -571,6 +574,7 @@ class Map : public GridRefManager<NGridType>
         {
             _updateObjects.erase(obj);
         }
+        bool GetMMapPosition(const Position& pos, Position& mmapPos, const Unit* targetUnit = nullptr);
 
     private:
 
@@ -665,6 +669,9 @@ class Map : public GridRefManager<NGridType>
         WorldObject* _GetScriptWorldObject(Object* obj, bool isSource, const ScriptInfo* scriptInfo) const;
         void _ScriptProcessDoor(Object* source, Object* target, const ScriptInfo* scriptInfo) const;
         GameObject* _FindGameObject(WorldObject* pWorldObject, ObjectGuid::LowType guid) const;
+
+        const dtNavMesh* m_navmesh;
+        const dtNavMeshQuery* m_navmeshquery;
 
         time_t i_gridExpiry;
 

@@ -45,11 +45,19 @@ void FleeingMovementGenerator<T>::_setTargetLocation(T* owner)
 
     // Add LOS check for target point
     Position mypos = owner->GetPosition();
+
+    // Try to get mmap height for destination point.
+    const Position pos(x, y, z);
+    Position mmapPos(0.0f, 0.0f, 0.0f);
+    bool haveMmap = owner->GetMap()->GetMMapPosition(pos, mmapPos);
+    if (haveMmap && mmapPos.GetPositionZ() > z)
+        z = mmapPos.GetPositionZ();
+
     bool isInLOS = VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(owner->GetMapId(),
                                                                                 mypos.m_positionX,
                                                                                 mypos.m_positionY,
-                                                                                mypos.m_positionZ + 2.0f,
-                                                                                x, y, z + 2.0f);
+                                                                                mypos.m_positionZ + MAP_SEARCH_DISTANCE_Z,
+                                                                                x, y, z + MAP_SEARCH_DISTANCE_Z);
     if (!isInLOS)
     {
         i_nextCheckTime.Reset(200);
