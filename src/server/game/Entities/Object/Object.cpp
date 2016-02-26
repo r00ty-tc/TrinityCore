@@ -1417,7 +1417,6 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z, bool valida
 
                 float dist = (lastPos) ? lastPos->GetExactDist2d(x, y) : ToCreature()->GetExactDist2d(x, y);
                 validateLastPosition = (validateLastPosition && dist > 0.0f);
-                float maxDelta = validateLastPosition ? tan(60.0f * 3.14159265f / 180.0f) * ((lastPos) ? lastPos->GetExactDist2d(x,y) : GetExactDist2d(x, y)) + 0.2f : 50.0f;
 
                 // Get the mmap floor if present, as a good start
                 const Position pos(x, y, z);
@@ -1446,7 +1445,9 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z, bool valida
                 }
                 else
                 {
-                    // Try to find ground level closest to navmesh z
+                    if (ToCreature()->IsPet())
+                        TC_LOG_INFO("misc", "Initial Z %f new z %f", pos.GetPositionZ(), z);
+                    // Try to find ground level closest to navmesh z.
                     for (thisDelta = -2.0f; thisDelta <= 8.0f; thisDelta += 2.0f)
                     {
                         max_z = canSwim
@@ -1461,15 +1462,27 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z, bool valida
                             else if (z < ground_z)
                                 thisZ = ground_z;
 
+                            if (ToCreature()->IsPet())
+                                TC_LOG_INFO("misc", "At %f we found %f, best %f", thisDelta, thisZ, bestDiff);
+
+                            //if (lastPos)
+                            //{
+                                //if (!this->IsWithinLOS(x, y, thisZ))
+                                //{
+                                //    TC_LOG_INFO("misc", "Not in LOS at %f", thisZ);
+                                //    continue;
+                                //}
+                                //TC_LOG_INFO("misc", "IN LOS at %f", thisZ);
+                            //}
+
                             if (fabs(z - thisZ) < 1.0f)
                             {
                                 bestDiff = thisZ;
                                 break;
                             }
 
-                            if (fabs(z - thisZ) < z - bestDiff)
+                            if (fabs(z - thisZ) < fabs(z - bestDiff))
                                 bestDiff = thisZ;
-
                             else if (bestDiff < z + 50.0f)
                             {
                                 break;
@@ -1478,6 +1491,9 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z, bool valida
                     }
                     if (bestDiff < z + 50.0f)
                         z = bestDiff;
+
+                    if (ToCreature()->IsPet())
+                        TC_LOG_INFO("misc", "Best is %f", bestDiff);
                 }
             }
             else
@@ -1497,17 +1513,39 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float &z, bool valida
                 const Position pos(x, y, z);
                 Position mmapPos(0.0f, 0.0f, 0.0f);
                 if (GetMap()->GetMMapPosition(pos, mmapPos))
-                    if (mmapPos.GetPositionZ() > z)
-                        z = mmapPos.GetPositionZ();
+                    z = mmapPos.GetPositionZ();
+
+                float thisDelta = MAP_SEARCH_DISTANCE_Z;
+                float bestDiff = z + 50.0f;
+                float max_z = 0.0f;
 
                 float ground_z = z;
-                float max_z = GetMap()->GetWaterOrGroundLevel(x, y, z, &ground_z, !ToUnit()->HasAuraType(SPELL_AURA_WATER_WALK));
-                if (max_z > INVALID_HEIGHT)
+                for (thisDelta = -2.0f; thisDelta <= 8.0f; thisDelta += 2.0f)
                 {
-                    if (z > max_z)
-                        z = max_z;
-                    else if (z < ground_z)
-                        z = ground_z;
+                    float max_z = GetMap()->GetWaterOrGroundLevel(x, y, z, &ground_z, !ToUnit()->HasAuraType(SPELL_AURA_WATER_WALK), thisDelta);
+                    if (max_z > INVALID_HEIGHT)
+                    {
+                        float thisZ = 50.0f;
+                        if (z > max_z)
+                            thisZ = max_z;
+                        else if (z < ground_z)
+                            thisZ = ground_z;
+
+                        if (fabs(z - thisZ) < 1.0f)
+                        {
+                            bestDiff = thisZ;
+                            break;
+                        }
+
+                        if (fabs(z - thisZ) < fabs(z - bestDiff))
+                            bestDiff = thisZ;
+                        else if (bestDiff < z + 50.0f)
+                        {
+                            break;
+                        }
+                    }
+                    if (bestDiff < z + 50.0f)
+                        z = bestDiff;
                 }
             }
             else
@@ -2404,8 +2442,10 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
 {
     angle += GetOrientation();
     float destx, desty, destz;
-    destx = pos.m_positionX + dist * std::cos(angle);
-    desty = pos.m_positionY + dist * std::sin(angle);
+    //destx = pos.m_positionX + dist * std::cos(angle);
+    //desty = pos.m_positionY + dist * std::sin(angle);
+    destx = pos.GetPositionX();
+    desty = pos.GetPositionY();
 
     // Prevent invalid coordinates here, position is unchanged
     if (!Trinity::IsValidMapCoord(destx, desty))
@@ -2415,6 +2455,54 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
     }
 
     destz = NormalizeZforCollision(this, destx, desty, pos.GetPositionZ());
+
+    float step = dist / 10.0f;
+
+    if (std::fabs(destz - pos.m_positionX) > 4.0f)
+    {
+        for (uint8 j = 0; j < 10; ++j)
+        {
+            // do not allow too big z changes
+            /*if (std::fabs(pos.m_positionZ - destz) > 6.0f)
+            {
+            destx -= step * std::cos(angle);
+            desty -= step * std::sin(angle);
+            destz = NormalizeZforCollision(this, destx, desty, pos.GetPositionZ());
+            }
+            // we have correct destz now
+            else
+            {
+            pos.Relocate(destx, desty, destz);
+            break;
+            }*/
+
+            float lastx = destx;
+            float lasty = desty;
+            float lastz = destz;
+
+            // Trying something different - Should move along the path from navmesh until adjusted z changes by more than 4.0f
+            destx += step * std::cos(angle);
+            desty += step * std::sin(angle);
+            destz = NormalizeZforCollision(this, destx, desty, destz);
+            //UpdateAllowedPositionZ(destx, desty, destz, true);
+
+            // Check gradient for this section
+            dist = std::sqrt((destx - lastx)*(destx - lastx) + (desty - desty)*(desty - lasty));
+            float riseAngle = std::atan((destz - lastz) / dist) * (180 / M_PI);
+            if ((riseAngle > 50.0f || riseAngle < -50.0f) && std::fabs(destz - lastz) > 2.0f)
+            {
+
+                TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, pos.m_positionZ, destz, dist);
+                break;
+            }
+
+            if (std::fabs(pos.GetPositionZ() - destz) > 4.0f)
+            {
+                break;
+            }
+        }
+    }
+
     bool col = VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(GetMapId(), pos.m_positionX, pos.m_positionY, pos.m_positionZ + 0.5f, destx, desty, destz + 0.5f, destx, desty, destz, -0.5f);
 
     // collision occured
@@ -2437,24 +2525,47 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
         dist = std::sqrt((pos.m_positionX - destx)*(pos.m_positionX - destx) + (pos.m_positionY - desty)*(pos.m_positionY - desty));
     }
 
-    float step = dist / 10.0f;
+    float stepx = pos.m_positionX;
+    float stepy = pos.m_positionY;
+    float stepz = pos.m_positionZ;
 
     for (uint8 j = 0; j < 10; ++j)
     {
-        // do not allow too big z changes
-        if (std::fabs(pos.m_positionZ - destz) > 6.0f)
+        float lastx = stepx;
+        float lasty = stepy;
+        float lastz = stepz;
+        stepx += step * std::cos(angle);
+        stepy += step * std::sin(angle);
+        stepz = NormalizeZforCollision(this, stepx, stepy, stepz);
+
+        // Check gradient for this section
+        dist = std::sqrt((lastx - stepx)*(lastx - stepx) + (lasty - stepy)*(lasty - stepy));
+        float riseAngle = std::atan((lastz - stepz) / dist) * (180 / M_PI);
+        if ((riseAngle > 50.0f || riseAngle < -50.0f) && fabs(lastz - stepz) > 2.0f)
         {
-            destx -= step * std::cos(angle);
-            desty -= step * std::sin(angle);
-            destz = NormalizeZforCollision(this, destx, desty, pos.GetPositionZ());
+
+            TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, pos.m_positionZ, destz, dist);
+            break;
         }
-        // we have correct destz now
-        else
+
+        //UpdateAllowedPositionZ(stepx, stepy, stepz, true);
+        if (std::fabs(pos.GetPositionZ() - destz) > 4.0f)
         {
-            pos.Relocate(destx, desty, destz);
             break;
         }
     }
+
+    // Final validation for climb angle > 50degrees
+    dist = std::sqrt((pos.m_positionX - destx)*(pos.m_positionX - destx) + (pos.m_positionY - desty)*(pos.m_positionY - desty));
+    float riseAngle = std::atan((destz - pos.m_positionZ) / dist) * (180 / M_PI);
+    if ((riseAngle > 50.0f || riseAngle < -50.0f) && fabs (destz - pos.m_positionZ) > 2.0f)
+    {
+        
+        TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, pos.m_positionZ, destz, dist);
+        return;
+    }
+    
+    pos.Relocate(destx, desty, destz);
 
     Trinity::NormalizeMapCoord(pos.m_positionX);
     Trinity::NormalizeMapCoord(pos.m_positionY);

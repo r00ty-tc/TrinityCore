@@ -90,6 +90,12 @@ bool ConfusedMovementGenerator<T>::DoUpdate(T* unit, uint32 diff)
 
             unit->MovePositionToFirstCollision(pos, dest, 0.0f);
 
+            if (pos.m_positionX == i_x && pos.m_positionY == i_y)
+            {
+                i_nextMoveTime.Reset(100);
+                return true;
+            }
+
             PathGenerator path(unit);
             path.SetPathLengthLimit(30.0f);
             bool result = path.CalculatePath(pos.m_positionX, pos.m_positionY, pos.m_positionZ);
@@ -100,9 +106,13 @@ bool ConfusedMovementGenerator<T>::DoUpdate(T* unit, uint32 diff)
             }
 
             Movement::MoveSplineInit init(unit);
+            const G3D::Vector3 endPos = path.GetActualEndPosition();
+            float destZ = endPos.z;
+            unit->UpdateAllowedPositionZ(endPos.x, endPos.y, destZ, true);
             init.MovebyPath(path.GetPath());
             init.SetWalk(true);
             init.Launch();
+            pos.Relocate(endPos.x, endPos.y, destZ);
         }
     }
 
