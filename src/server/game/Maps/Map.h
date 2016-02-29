@@ -250,7 +250,9 @@ struct ZoneDynamicInfo
 #define MAX_FALL_DISTANCE     250000.0f                     // "unlimited fall" to find VMap ground if it is available, just larger than MAX_HEIGHT - INVALID_HEIGHT
 #define DEFAULT_HEIGHT_SEARCH     50.0f                     // default search distance to find height at nearby locations
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
-#define MAP_SEARCH_DISTANCE_Z      2.0f
+#define MAP_SEARCH_DISTANCE_Z      2.0f                     // Distance above Z for which ground is searched for downwards
+#define MAP_MAXPLAYER_MMAP_ANGLE  55.0f                     // For player movement generators, maximum angle of mmap poly to be accepted in path
+#define MAP_MINPLAYER_MMAP_ANGLE -55.0f                     // For player movement generators, maximum angle of mmap poly to be accepted in path
 
 typedef std::map<uint32/*leaderDBGUID*/, CreatureGroup*>        CreatureGroupHolderType;
 

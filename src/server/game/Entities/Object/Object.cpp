@@ -2486,13 +2486,27 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
             destz = NormalizeZforCollision(this, destx, desty, destz);
             //UpdateAllowedPositionZ(destx, desty, destz, true);
 
-            // Check gradient for this section
+            // Check gradient for this section (on the mmap poly, not the main map)
             dist = std::sqrt((destx - lastx)*(destx - lastx) + (desty - desty)*(desty - lasty));
-            float riseAngle = std::atan((destz - lastz) / dist) * (180 / M_PI);
-            if ((riseAngle > 50.0f || riseAngle < -50.0f) && std::fabs(destz - lastz) > 2.0f)
+            Position lastPos(lastx, lasty, lastz);
+            Position destPos(destx, desty, destz);
+            Position mmapPos(0.0f, 0.0f, 0.0f);
+            float lastZM = lastz;
+            float destZM = destz;
+            if (GetMap()->GetMMapPosition(lastPos, mmapPos))
+                lastZM = mmapPos.m_positionZ;
+            if (GetMap()->GetMMapPosition(destPos, mmapPos))
+                destZM = mmapPos.m_positionZ;
+
+            float riseAngle = std::atan((destZM - lastZM) / dist) * (180 / M_PI);
+            if (riseAngle > MAP_MAXPLAYER_MMAP_ANGLE || riseAngle < MAP_MINPLAYER_MMAP_ANGLE)
             {
 
                 TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, pos.m_positionZ, destz, dist);
+                destx = lastx;
+                desty = lasty;
+                destz = lastz;
+                destz = NormalizeZforCollision(this, destx, desty, destz);
                 break;
             }
 
@@ -2528,6 +2542,7 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
     float stepx = pos.m_positionX;
     float stepy = pos.m_positionY;
     float stepz = pos.m_positionZ;
+    step = dist / 10.0f;
 
     for (uint8 j = 0; j < 10; ++j)
     {
@@ -2540,11 +2555,24 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
 
         // Check gradient for this section
         dist = std::sqrt((lastx - stepx)*(lastx - stepx) + (lasty - stepy)*(lasty - stepy));
-        float riseAngle = std::atan((lastz - stepz) / dist) * (180 / M_PI);
-        if ((riseAngle > 50.0f || riseAngle < -50.0f) && fabs(lastz - stepz) > 2.0f)
+        Position lastPos(lastx, lasty, lastz);
+        Position destPos(stepx, stepy, stepz);
+        Position mmapPos(0.0f, 0.0f, 0.0f);
+        float lastZM = lastz;
+        float stepZM = stepz;
+        if (GetMap()->GetMMapPosition(lastPos, mmapPos))
+            lastZM = mmapPos.m_positionZ;
+        if (GetMap()->GetMMapPosition(destPos, mmapPos))
+            stepZM = mmapPos.m_positionZ;
+        float riseAngle = std::atan((lastZM - stepZM) / dist) * (180 / M_PI);
+        if (riseAngle > MAP_MAXPLAYER_MMAP_ANGLE || riseAngle < MAP_MINPLAYER_MMAP_ANGLE)
         {
 
-            TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, pos.m_positionZ, destz, dist);
+            TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, lastZM, stepZM, dist);
+            destx = lastx;
+            desty = lasty;
+            destz = lastz;
+            destz = NormalizeZforCollision(this, destx, desty, destz);
             break;
         }
 
@@ -2557,8 +2585,16 @@ void WorldObject::MovePositionToFirstCollision(Position &pos, float dist, float 
 
     // Final validation for climb angle > 50degrees
     dist = std::sqrt((pos.m_positionX - destx)*(pos.m_positionX - destx) + (pos.m_positionY - desty)*(pos.m_positionY - desty));
-    float riseAngle = std::atan((destz - pos.m_positionZ) / dist) * (180 / M_PI);
-    if ((riseAngle > 50.0f || riseAngle < -50.0f) && fabs (destz - pos.m_positionZ) > 2.0f)
+    Position destPos(destx, desty, destz);
+    Position mmapPos(0.0f, 0.0f, 0.0f);
+    float lastZM = pos.m_positionZ;
+    float destZM = destz;
+    if (GetMap()->GetMMapPosition(pos, mmapPos))
+        lastZM = mmapPos.m_positionZ;
+    if (GetMap()->GetMMapPosition(destPos, mmapPos))
+        destZM = mmapPos.m_positionZ;
+    float riseAngle = std::atan((destZM - lastZM) / dist) * (180 / M_PI);
+    if (riseAngle > MAP_MAXPLAYER_MMAP_ANGLE || riseAngle < MAP_MINPLAYER_MMAP_ANGLE)
     {
         
         TC_LOG_INFO("misc", "Blocked movement, rise was too high %f, orig z %f, new z %f dist %f", riseAngle, pos.m_positionZ, destz, dist);

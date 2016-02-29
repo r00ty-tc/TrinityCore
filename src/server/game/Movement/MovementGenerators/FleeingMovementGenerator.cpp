@@ -52,6 +52,7 @@ void FleeingMovementGenerator<T>::_setTargetLocation(T* owner)
     bool haveMmap = owner->GetMap()->GetMMapPosition(pos, mmapPos);
     if (haveMmap && mmapPos.GetPositionZ() > z)
         z = mmapPos.GetPositionZ();
+    owner->UpdateAllowedPositionZ(x, y, z, true);
 
     bool isInLOS = VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(owner->GetMapId(),
                                                                                 mypos.m_positionX,
@@ -66,7 +67,7 @@ void FleeingMovementGenerator<T>::_setTargetLocation(T* owner)
 
     PathGenerator path(owner);
     path.SetPathLengthLimit(30.0f);
-    bool result = path.CalculatePath(x, y, z);
+    bool result = path.CalculatePath(x, y, z, false, true);
     if (!result || (path.GetPathType() & PATHFIND_NOPATH))
     {
         i_nextCheckTime.Reset(100);
