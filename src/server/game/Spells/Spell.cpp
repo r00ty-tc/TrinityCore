@@ -3928,7 +3928,25 @@ void Spell::SendPetCastResult(SpellCastResult result)
     player->SendDirectMessage(&data);
 }
 
-void Spell::SendSpellStart()
+void Spell::SendResumeCastBar(Player const* targetPlayer)
+{
+    if (!targetPlayer)
+        return;
+
+    WorldPacket data(SMSG_RESUME_CAST_BAR, (8+8+4+4+4));
+    data << m_caster->GetPackGUID();
+
+    if (Unit* unit = m_targets.GetUnitTarget())
+        data << unit->GetPackGUID();
+    else
+        data << m_caster->GetPackGUID();
+    data << uint32(m_spellInfo->Id);
+    data << int32(m_timer);
+    data << int32(m_casttime);
+    targetPlayer->GetSession()->SendPacket(&data);
+}
+
+void Spell::SendSpellStart(Player const* targetPlayer)
 {
     if (!IsNeedSendToClient())
         return;
@@ -3980,7 +3998,10 @@ void Spell::SendSpellStart()
         data << uint32(mechanicImmunityMask);
     }
 
-    m_caster->SendMessageToSet(&data, true);
+    if (targetPlayer)
+        targetPlayer->GetSession()->SendPacket(&data);
+    else
+        m_caster->SendMessageToSet(&data, true);
 }
 
 void Spell::SendSpellGo()
