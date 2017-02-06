@@ -573,7 +573,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         void RemoveCreatureRespawnTime(ObjectGuid::LowType spawnId = 0, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool respawnCreature = false, SQLTransaction respawntrans = nullptr);
         void RemoveGORespawnTime(ObjectGuid::LowType spawnId = 0, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool respawnObject = false, SQLTransaction respawntrans = nullptr);
 
-        uint32 GetPlayersInRangeOfPosition(const Position* pos, uint32 phaseMask, float range, std::list<Player*>& playerList);
+        uint32 GetPlayersInRangeOfPosition(Position const* pos, uint32 phaseMask, float range, std::list<Player*>& playerList);
 
         void LoadCorpseData();
         void DeleteCorpseData();
@@ -643,8 +643,8 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         void RemoveDynamicObjectFromMoveList(DynamicObject* go);
 
         void RespawnCellAreaZone(uint32 cellId, uint32 zoneId, uint32 areaId);
-        void RespawnCreatureList(const RespawnVector& RespawnData, bool force = false);
-        void RespawnGameObjectList(const RespawnVector& RespawnData, bool force = false);
+        void RespawnCreatureList(RespawnVector const& RespawnData, bool force = false);
+        void RespawnGameObjectList(RespawnVector const& RespawnData, bool force = false);
         void transformRespawnList(RespawnVector& RespawnData, uint32 numPlayers, float adjustFactor, uint32 minAdjustSpawn, uint32 mode);
 
         void AddCreatureRespawnInfo(RespawnInfo& Info, bool replace = false)

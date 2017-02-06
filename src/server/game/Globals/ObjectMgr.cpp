@@ -6782,7 +6782,7 @@ bool ObjectMgr::SpawnCreatureGroup(uint32 groupId, Map* map, bool ignoreRespawn,
 
     for (ObjectGuid::LowType guid : spawnList)
     {
-        if (const CreatureData* cdata = GetCreatureData(guid))
+        if (CreatureData const* cdata = GetCreatureData(guid))
         {
             ASSERT(itr->second.mapId == cdata->mapid);
 
@@ -6889,7 +6889,7 @@ bool ObjectMgr::SpawnGOGroup(uint32 groupId, Map* map, bool ignoreRespawn, bool 
 
     for (ObjectGuid::LowType guid : golist)
     {
-        if (const GameObjectData* godata = GetGOData(guid))
+        if (GameObjectData const* godata = GetGOData(guid))
         {
             ASSERT(itr->second.mapId == godata->mapid);
 

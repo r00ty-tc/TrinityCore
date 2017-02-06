@@ -3023,7 +3023,7 @@ bool Map::getRespawnInfo(respawnInfoMultiMap const& gridList, respawnInfoMultiMa
 
     if (cellAreaZoneId || gridId)
     {
-        const auto spawnBounds = cellAreaZoneId ? cellAreaZoneList.equal_range(cellAreaZoneId) : gridList.equal_range(gridId);
+        auto const spawnBounds = cellAreaZoneId ? cellAreaZoneList.equal_range(cellAreaZoneId) : gridList.equal_range(gridId);
         if (spawnBounds.first == spawnBounds.second)
             return false;
 
@@ -3082,7 +3082,7 @@ void Map::deleteRespawnInfo(respawnInfoMultiMap& gridList, respawnInfoMultiMap& 
     }
 }
 
-void Map::RespawnCreatureList(const RespawnVector& RespawnData, bool force)
+void Map::RespawnCreatureList(RespawnVector const& RespawnData, bool force)
 {
     SQLTransaction trans = CharacterDatabase.BeginTransaction();
     for (RespawnInfo* ri : RespawnData)
@@ -3103,8 +3103,8 @@ void Map::RespawnCreatureList(const RespawnVector& RespawnData, bool force)
 
             Creature* creature = itr->second;
             uint32 groupFlags = 0;
-            if (const CreatureData* cdata = creature->GetCreatureData())
-                if (const CreatureGroupTemplateData* groupData = cdata->groupdata)
+            if (CreatureData const* cdata = creature->GetCreatureData())
+                if (CreatureGroupTemplateData const* groupData = cdata->groupdata)
                     groupFlags = groupData->flags;
 
             // Skip this NPC if it's an Escort NPC, on an escort right now that gives a quest, not in an instance and dynamic escort NPCs are enabled.
@@ -3144,8 +3144,8 @@ void Map::RespawnCreatureList(const RespawnVector& RespawnData, bool force)
             }
             else
             {
-                const ObjectGuid::LowType spawnId = ri->spawnId;
-                if (const CreatureData* cdata = sObjectMgr->GetCreatureData(spawnId))
+                ObjectGuid::LowType const spawnId = ri->spawnId;
+                if (CreatureData const* cdata = sObjectMgr->GetCreatureData(spawnId))
                 {
                     // Always delete the respawn time
                     RemoveCreatureRespawnTime(ri->spawnId, 0, 0, false, trans);
@@ -3178,7 +3178,7 @@ void Map::RespawnCreatureList(const RespawnVector& RespawnData, bool force)
     CharacterDatabase.CommitTransaction(trans);
 }
 
-void Map::RespawnGameObjectList(const RespawnVector& RespawnData, bool force)
+void Map::RespawnGameObjectList(RespawnVector const& RespawnData, bool force)
 {
     SQLTransaction trans = CharacterDatabase.BeginTransaction();
     for (RespawnInfo* ri : RespawnData)
@@ -3207,7 +3207,7 @@ void Map::RespawnGameObjectList(const RespawnVector& RespawnData, bool force)
             else
             {
                 ObjectGuid::LowType spawnId = ri->spawnId;
-                if (const GameObjectData* cdata = sObjectMgr->GetGOData(spawnId))
+                if (GameObjectData const* cdata = sObjectMgr->GetGOData(spawnId))
                 {
                     // Always delete the respawn time
                     RemoveGORespawnTime(ri->spawnId, 0, 0, false, trans);
@@ -3284,7 +3284,7 @@ void Map::transformRespawnList(RespawnVector& RespawnData, uint32 numPlayers, fl
         switch (mode)
         {
             case RESPAWNMODE_CREATURE:
-                if (const CreatureData* cdata = sObjectMgr->GetCreatureData(ri->spawnId))
+                if (CreatureData const* cdata = sObjectMgr->GetCreatureData(ri->spawnId))
                 {
                     if (CreatureGroupTemplateData* groupdata = cdata->groupdata)
                     {
@@ -3304,7 +3304,7 @@ void Map::transformRespawnList(RespawnVector& RespawnData, uint32 numPlayers, fl
                         }
 
                         // Get players by grid searcher
-                        const Position pos = Position(cdata->posX, cdata->posY, cdata->posZ);
+                        Position const pos = Position(cdata->posX, cdata->posY, cdata->posZ);
                         std::list<Player*> playerList;
                         if (GetPlayersInRangeOfPosition(&pos, cdata->phaseMask, sWorld->getFloatConfig(CONFIG_RESPAWN_DYNAMICRADIUS), playerList))
                         {
@@ -3321,7 +3321,7 @@ void Map::transformRespawnList(RespawnVector& RespawnData, uint32 numPlayers, fl
                 }
                 break;
             case RESPAWNMODE_GAMEOBJECT:
-                if (const GameObjectData* godata = sObjectMgr->GetGOData(ri->spawnId))
+                if (GameObjectData const* godata = sObjectMgr->GetGOData(ri->spawnId))
                 {
                     if (GameObjectGroupTemplateData* groupdata = godata->groupdata)
                     {
@@ -3341,7 +3341,7 @@ void Map::transformRespawnList(RespawnVector& RespawnData, uint32 numPlayers, fl
                             continue;
                         }
 
-                        const Position pos = Position(godata->posX, godata->posY, godata->posZ);
+                        Position const pos = Position(godata->posX, godata->posY, godata->posZ);
                         std::list<Player*> playerList;
 
                         // Only need to work with results above 1. 1 player in the area means nothing to do.
@@ -3453,7 +3453,7 @@ bool Map::GetRespawnData(RespawnVector& results, RespawnObjectType type, bool on
     return getRespawnInfo(gridList, scopeList, spawnIdList, results, 0, 0, zoneAreaCellId, onlyDue);
 }
 
-uint32 Map::GetPlayersInRangeOfPosition(const Position* pos, uint32 phaseMask, float range, std::list<Player*>& playerList)
+uint32 Map::GetPlayersInRangeOfPosition(Position const* pos, uint32 phaseMask, float range, std::list<Player*>& playerList)
 {
     Trinity::AnyPlayerInPositionRangeCheck checker(pos, range);
     Trinity::PlayerListSearcherByPosition<Trinity::AnyPlayerInPositionRangeCheck> searcher(phaseMask, playerList, checker);
@@ -4216,7 +4216,7 @@ Creature* Map::GetCreature(ObjectGuid const& guid)
 
 Creature* Map::GetCreatureBySpawnId(ObjectGuid::LowType spawnId)
 {
-    const auto bounds = GetCreatureBySpawnIdStore().equal_range(spawnId);
+    auto const bounds = GetCreatureBySpawnIdStore().equal_range(spawnId);
     if (bounds.first == bounds.second)
         return nullptr;
 
@@ -4230,7 +4230,7 @@ Creature* Map::GetCreatureBySpawnId(ObjectGuid::LowType spawnId)
 
 GameObject* Map::GetGameObjectBySpawnId(ObjectGuid::LowType spawnId)
 {
-    const auto bounds = GetGameObjectBySpawnIdStore().equal_range(spawnId);
+    auto const bounds = GetGameObjectBySpawnIdStore().equal_range(spawnId);
     if (bounds.first == bounds.second)
         return nullptr;
 
@@ -4281,7 +4281,7 @@ void Map::SaveCreatureRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, tim
         return;
     }
 
-    const time_t timeNow = time(NULL);
+    time_t const timeNow = time(NULL);
     RespawnInfo ri;
     ri.spawnId = spawnId;
     ri.entry = entry;
@@ -4321,7 +4321,7 @@ void Map::SaveGORespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t re
         return;
     }
 
-    const time_t timeNow = time(NULL);
+    time_t const timeNow = time(NULL);
     RespawnInfo ri;
     ri.spawnId = spawnId;
     ri.entry = entry;
@@ -4383,7 +4383,7 @@ void Map::LoadRespawnTimes()
             ObjectGuid::LowType loguid = fields[0].GetUInt32();
             uint32 respawnTime = fields[1].GetUInt32();
 
-            if (const CreatureData* cdata = sObjectMgr->GetCreatureData(loguid))
+            if (CreatureData const* cdata = sObjectMgr->GetCreatureData(loguid))
                 SaveCreatureRespawnTime(loguid, cdata->id, time_t(respawnTime), GetZoneAreaGridId(OBJECT_TYPE_CREATURE, cdata->posX, cdata->posY, cdata->posZ), Trinity::ComputeGridCoord(cdata->posX, cdata->posY).GetId(), false);
 
         } while (result->NextRow());
@@ -4400,7 +4400,7 @@ void Map::LoadRespawnTimes()
             ObjectGuid::LowType loguid = fields[0].GetUInt32();
             uint32 respawnTime = fields[1].GetUInt32();
 
-            if (const GameObjectData* godata = sObjectMgr->GetGOData(loguid))
+            if (GameObjectData const* godata = sObjectMgr->GetGOData(loguid))
                 SaveGORespawnTime(loguid, godata->id, time_t(respawnTime), GetZoneAreaGridId(OBJECT_TYPE_GAMEOBJECT, godata->posX, godata->posY, godata->posZ), Trinity::ComputeGridCoord(godata->posX, godata->posY).GetId(), false);
 
         } while (result->NextRow());

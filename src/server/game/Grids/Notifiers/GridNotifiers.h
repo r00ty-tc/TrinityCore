@@ -1310,7 +1310,7 @@ namespace Trinity
     class AnyPlayerInPositionRangeCheck
     {
     public:
-        AnyPlayerInPositionRangeCheck(const Position* pos, float range, bool reqAlive = true) : _pos(pos), _range(range), _reqAlive(reqAlive) { }
+        AnyPlayerInPositionRangeCheck(Position const* pos, float range, bool reqAlive = true) : _pos(pos), _range(range), _reqAlive(reqAlive) { }
         bool operator()(Player* u)
         {
             if (_reqAlive && !u->IsAlive())
@@ -1323,7 +1323,7 @@ namespace Trinity
         }
 
     private:
-        const Position* const _pos;
+        Position const* _pos;
         float _range;
         bool _reqAlive;
     };

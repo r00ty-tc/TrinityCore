@@ -128,14 +128,14 @@ void LoadHelper(CellGuidSet const& guid_set, CellCoord &cell, GridRefManager<T> 
             if (obj->GetTypeId() == TYPEID_UNIT)
             {
                 // If creature in manual spawn group, don't spawn here, unless group is already active.
-                const CreatureData* cdata = sObjectMgr->GetCreatureData(guid);
+                CreatureData const* cdata = sObjectMgr->GetCreatureData(guid);
                 if (cdata && cdata->groupdata && (cdata->groupdata->flags & CREATUREGROUP_FLAG_MANUAL_SPAWN) && !cdata->groupdata->isActive)
                     continue;
             }
             else if (obj->GetTypeId() == TYPEID_GAMEOBJECT)
             {
                 // If gameobject in manual spawn group, don't spawn here, unless group is already active.
-                const GameObjectData* godata = sObjectMgr->GetGOData(guid);
+                GameObjectData const* godata = sObjectMgr->GetGOData(guid);
                 if (godata && godata->groupdata && (godata->groupdata->flags & GAMEOBJECTGROUP_FLAG_MANUAL_SPAWN) && !godata->groupdata->isActive)
                     continue;
             }

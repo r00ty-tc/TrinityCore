@@ -296,9 +296,9 @@ void npc_escortAI::UpdateAI(uint32 diff)
 
                 uint32 groupFlags = 0;
 
-                if (const CreatureData* cdata = me->GetCreatureData())
+                if (CreatureData const* cdata = me->GetCreatureData())
                 {
-                    if (const CreatureGroupTemplateData* groupData = cdata->groupdata)
+                    if (CreatureGroupTemplateData const* groupData = cdata->groupdata)
                         groupFlags = groupData->flags;
                 }
 
@@ -451,9 +451,9 @@ void npc_escortAI::Start(bool isActiveAttacker /* = true*/, bool run /* = false 
     // Queue respawn from the point it starts
     if (Map* map = me->GetMap())
     {
-        if (const CreatureData* cdata = me->GetCreatureData())
+        if (CreatureData const* cdata = me->GetCreatureData())
         {
-            if (const CreatureGroupTemplateData* groupdata = cdata->groupdata)
+            if (CreatureGroupTemplateData const* groupdata = cdata->groupdata)
             {
                 if (sWorld->getBoolConfig(CONFIG_RESPAWN_DYNAMIC_ESCORTNPC) && (groupdata->flags & CREATUREGROUP_FLAG_ESCORTQUESTNPC) && !map->GetCreatureRespawnTime(me->GetSpawnId()))
                 {

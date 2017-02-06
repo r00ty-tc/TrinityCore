@@ -127,7 +127,7 @@ public:
                 // If map found, try to find active version of this creature
                 if (thisMap)
                 {
-                    const auto creBounds = thisMap->GetCreatureBySpawnIdStore().equal_range(guid);
+                    auto const creBounds = thisMap->GetCreatureBySpawnIdStore().equal_range(guid);
                     if (creBounds.first != creBounds.second)
                     {
                         for (std::unordered_multimap<uint32, Creature*>::const_iterator itr = creBounds.first; itr != creBounds.second;)
@@ -446,7 +446,7 @@ public:
                 // If map found, try to find active version of this object
                 if (thisMap)
                 {
-                    const auto goBounds = thisMap->GetGameObjectBySpawnIdStore().equal_range(guid);
+                    auto const goBounds = thisMap->GetGameObjectBySpawnIdStore().equal_range(guid);
                     if (goBounds.first != goBounds.second)
                     {
                         for (std::unordered_multimap<uint32, GameObject*>::const_iterator itr = goBounds.first; itr != goBounds.second;)

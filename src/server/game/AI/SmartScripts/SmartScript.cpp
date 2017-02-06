@@ -2498,8 +2498,8 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
         {
             if (e.action.groupSpawn.minDelay == 0 && e.action.groupSpawn.maxDelay == 0)
             {
-                const bool ignoreRespawn = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_IGNORE_RESPAWN) != 0);
-                const bool force = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_FORCE_SPAWN) != 0);
+                bool const ignoreRespawn = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_IGNORE_RESPAWN) != 0);
+                bool const force = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_FORCE_SPAWN) != 0);
 
                 // Instant spawn
                 sObjectMgr->SpawnCreatureGroup(e.action.groupSpawn.groupId, GetBaseObject()->GetMap(), ignoreRespawn, force);
@@ -2541,7 +2541,7 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
         {
             if (e.action.groupSpawn.minDelay == 0 && e.action.groupSpawn.maxDelay == 0)
             {
-                const bool deleteRespawnTimes = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_NOSAVE_RESPAWN) != 0);
+                bool const deleteRespawnTimes = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_NOSAVE_RESPAWN) != 0);
 
                 // Instant spawn
                 sObjectMgr->DespawnCreatureGroup(e.action.groupSpawn.groupId, GetBaseObject()->GetMap(), deleteRespawnTimes);
@@ -2583,8 +2583,8 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
         {
             if (e.action.groupSpawn.minDelay == 0 && e.action.groupSpawn.maxDelay == 0)
             {
-                const bool ignoreRespawn = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_IGNORE_RESPAWN) != 0);
-                const bool force = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_FORCE_SPAWN) != 0);
+                bool const ignoreRespawn = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_IGNORE_RESPAWN) != 0);
+                bool const force = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_FORCE_SPAWN) != 0);
 
                 // Instant spawn
                 sObjectMgr->SpawnGOGroup(e.action.groupSpawn.groupId, GetBaseObject()->GetMap(), ignoreRespawn, force);
@@ -2626,7 +2626,7 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
         {
             if (e.action.groupSpawn.minDelay == 0 && e.action.groupSpawn.maxDelay == 0)
             {
-                const bool deleteRespawnTimes = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_NOSAVE_RESPAWN) != 0);
+                bool const deleteRespawnTimes = ((e.action.groupSpawn.spawnflags & SMARTAI_SPAWN_FLAGS::SMARTAI_SPAWN_FLAG_NOSAVE_RESPAWN) != 0);
 
                 // Instant spawn
                 sObjectMgr->DespawnGOGroup(e.action.groupSpawn.groupId, GetBaseObject()->GetMap(), deleteRespawnTimes);
