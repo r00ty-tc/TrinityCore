@@ -297,8 +297,10 @@ void npc_escortAI::UpdateAI(uint32 diff)
                 uint32 groupFlags = 0;
 
                 if (const CreatureData* cdata = me->GetCreatureData())
+                {
                     if (const CreatureGroupTemplateData* groupData = cdata->groupdata)
                         groupFlags = groupData->flags;
+                }
 
                 if (m_bCanInstantRespawn && !(sWorld->getBoolConfig(CONFIG_RESPAWN_DYNAMIC_ESCORTNPC) && (groupFlags & CREATUREGROUP_FLAG_ESCORTQUESTNPC)))
                 {
@@ -459,7 +461,6 @@ void npc_escortAI::Start(bool isActiveAttacker /* = true*/, bool run /* = false 
                     me->SaveRespawnTime();
                 }
             }
-
         }
     }
 

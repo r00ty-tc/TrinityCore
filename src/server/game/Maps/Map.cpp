@@ -1726,7 +1726,6 @@ bool Map::UnloadGrid(NGridType& ngrid, bool unloadAll)
 
         GridMaps[gx][gy] = NULL;
     }
-
     TC_LOG_DEBUG("maps", "Unloading grid[%u, %u] for map %u finished", x, y, GetId());
     return true;
 }
@@ -2902,15 +2901,11 @@ void Map::RemoveCreatureRespawnTime(ObjectGuid::LowType spawnId, uint32 cellArea
         // Delete all creature respawns for this grid/cell/zone/area. Grid load will handle it the normal way
         for (RespawnInfo* ri : rv)
         {
-            // Don't delete dynamic spawns
-            if (ri->spawnId <= 0xFFFFFF)
-            {
-                PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN);
-                stmt->setUInt32(0, ri->spawnId);
-                stmt->setUInt16(1, GetId());
-                stmt->setUInt32(2, GetInstanceId());
-                trans->Append(stmt);
-            }
+            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN);
+            stmt->setUInt32(0, ri->spawnId);
+            stmt->setUInt16(1, GetId());
+            stmt->setUInt32(2, GetInstanceId());
+            trans->Append(stmt);
         }
         if (!respawntrans)
             CharacterDatabase.CommitTransaction(trans);
@@ -2936,15 +2931,11 @@ void Map::RemoveGORespawnTime(ObjectGuid::LowType spawnId, uint32 cellAreaZoneId
         // Delete all gameobject respawns for this grid. Grid load will handle it the normal way
         for (RespawnInfo* ri : rv)
         {
-            // Don't delete dynamic spawns
-            if (ri->spawnId <= 0xFFFFFF)
-            {
-                PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
-                stmt->setUInt32(0, ri->spawnId);
-                stmt->setUInt16(1, GetId());
-                stmt->setUInt32(2, GetInstanceId());
-                trans->Append(stmt);
-            }
+            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
+            stmt->setUInt32(0, ri->spawnId);
+            stmt->setUInt16(1, GetId());
+            stmt->setUInt32(2, GetInstanceId());
+            trans->Append(stmt);
         }
         if (!respawntrans)
             CharacterDatabase.CommitTransaction(trans);
@@ -3153,27 +3144,20 @@ void Map::RespawnCreatureList(const RespawnVector& RespawnData, bool force)
             }
             else
             {
-                if (ri->spawnId > 0xFFFFFF)
+                const ObjectGuid::LowType spawnId = ri->spawnId;
+                if (const CreatureData* cdata = sObjectMgr->GetCreatureData(spawnId))
                 {
-                    // Handling for respawn of dynamic creatures (NYI)
-                }
-                else
-                {
-                    const ObjectGuid::LowType spawnId = ri->spawnId;
-                    if (const CreatureData* cdata = sObjectMgr->GetCreatureData(spawnId))
+                    // Always delete the respawn time
+                    RemoveCreatureRespawnTime(ri->spawnId, 0, 0, false, trans);
+
+                    GridCoord thisGrid = Trinity::ComputeGridCoord(cdata->posX, cdata->posY);
+
+                    // Only actually spawn if the grid is loaded, if not it'll be spawned anyway when the grid is loaded
+                    if (IsGridLoaded(thisGrid))
                     {
-                        // Always delete the respawn time
-                        RemoveCreatureRespawnTime(ri->spawnId, 0, 0, false, trans);
-
-                        GridCoord thisGrid = Trinity::ComputeGridCoord(cdata->posX, cdata->posY);
-
-                        // Only actually spawn if the grid is loaded, if not it'll be spawned anyway when the grid is loaded
-                        if (IsGridLoaded(thisGrid))
-                        {
-                            Creature* obj = new Creature();
-                            if (!obj->LoadCreatureFromDB(spawnId, this, true))
-                                delete obj;
-                        }
+                        Creature* obj = new Creature();
+                        if (!obj->LoadCreatureFromDB(spawnId, this, true))
+                            delete obj;
                     }
                 }
             }
@@ -4308,7 +4292,7 @@ void Map::SaveCreatureRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, tim
     ri.spawnDelay = respawnTime > timeNow ? respawnTime - timeNow : 0;
     AddCreatureRespawnInfo(ri, replace);
 
-    if (!WriteDB || spawnId > 0xFFFFFF)
+    if (!WriteDB)
         return;
 
     SaveCreatureRespawnTimeDB(spawnId, ri.originalRespawnTime, respawntrans);
@@ -4348,7 +4332,7 @@ void Map::SaveGORespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t re
     ri.spawnDelay = respawnTime > timeNow ? respawnTime - timeNow : 0;
     AddGameObjectRespawnInfo(ri, replace);
 
-    if (!WriteDB || spawnId > 0xFFFFFF)
+    if (!WriteDB)
         return;
 
     SaveGORespawnTimeDB(spawnId, ri.originalRespawnTime, respawntrans);

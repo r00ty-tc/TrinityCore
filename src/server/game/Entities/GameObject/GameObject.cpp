@@ -187,7 +187,6 @@ bool GameObject::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* map, u
 
     Relocate(pos);
     m_stationaryPosition.Relocate(pos);
-
     if (!IsPositionValid())
     {
         TC_LOG_ERROR("misc", "Gameobject (GUID: %u Entry: %u) not created. Suggested coordinates isn't valid (X: %f Y: %f)", guidlow, name_id, pos.GetPositionX(), pos.GetPositionY());
@@ -455,9 +454,9 @@ void GameObject::Update(uint32 diff)
                         m_SkillupList.clear();
                         m_usetimes = 0;
 
-                    // If nearby linked trap exists, respawn it
-                    if (GameObject* linkedTrap = GetLinkedTrap())
-                        linkedTrap->SetLootState(GO_READY);
+                        // If nearby linked trap exists, respawn it
+                        if (GameObject* linkedTrap = GetLinkedTrap())
+                            linkedTrap->SetLootState(GO_READY);
 
                         switch (GetGoType())
                         {

@@ -227,7 +227,7 @@ public:
             { "delete",       rbac::RBAC_PERM_COMMAND_NPC_DELETE,       false, NULL,              "", npcDeleteCommandTable },
             { "follow",       rbac::RBAC_PERM_COMMAND_NPC_FOLLOW,       false, NULL,              "", npcFollowCommandTable },
             { "set",          rbac::RBAC_PERM_COMMAND_NPC_SET,          false, NULL,                 "", npcSetCommandTable },
-            { "evade",     rbac::RBAC_PERM_COMMAND_NPC_EVADE,     false, &HandleNpcEvadeCommand,             "" },
+            { "evade",        rbac::RBAC_PERM_COMMAND_NPC_EVADE,        false, &HandleNpcEvadeCommand,             ""       },
         };
         static std::vector<ChatCommand> commandTable =
         {
