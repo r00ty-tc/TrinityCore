@@ -1692,7 +1692,7 @@ Creature.MovingStopTimeForPlayer = 180000
 #        Description: Minimum time before a particular cell will check for respawned creatures.
 #                     While kept active by players this throttles the checks upon which creatures
 #                     should be respawned.
-#        Default:     5 - 5 seconds
+#        Default:     5000 - 5 seconds
 
 Respawn.MinCellCheckMS = 5000
 
@@ -1705,8 +1705,8 @@ Respawn.MinCellCheckMS = 5000
 #                     radius is changed.
 #                     Only creatures in a group which has the flag set for dynamic respawn will be
 #                     considered.
-#        Default:     0 - No dynamic respawn function
-#                     1 - Use number of players in radius
+#        Default:     1 - Use number of players in radius
+                      0 - No dynamic respawn function
 
 Respawn.DynamicMode = 1
 
