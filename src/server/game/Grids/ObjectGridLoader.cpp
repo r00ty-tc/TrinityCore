@@ -26,6 +26,7 @@
 #include "World.h"
 #include "CellImpl.h"
 #include "CreatureAI.h"
+#include "ScriptMgr.h"
 
 void ObjectGridEvacuator::Visit(CreatureMapType &m)
 {
@@ -131,6 +132,17 @@ void LoadHelper(CellGuidSet const& guid_set, CellCoord &cell, GridRefManager<T> 
                 CreatureData const* cdata = sObjectMgr->GetCreatureData(guid);
                 if (cdata && cdata->groupdata && (cdata->groupdata->flags & CREATUREGROUP_FLAG_MANUAL_SPAWN) && !cdata->groupdata->isActive)
                     continue;
+
+                // If script is blocking spawn, don't spawn but queue for a respawn
+                if (CreatureTemplate const* templateData = sObjectMgr->GetCreatureTemplate(guid))
+                {
+                    bool compatibleMode = cdata->groupdata ? (cdata->groupdata->flags & CREATUREGROUP_FLAG_COMPATIBILITY_MODE) : true;
+                    if (!compatibleMode && !sScriptMgr->CanSpawn(guid, cdata->id, templateData, cdata, map))
+                    {
+                        map->SaveCreatureRespawnTime(guid, cdata->id, time(NULL) + 1, map->GetZoneAreaGridId(Map::OBJECT_TYPE_CREATURE, cdata->posX, cdata->posY, cdata->posZ), Trinity::ComputeGridCoord(cdata->posX, cdata->posY).GetId(), false);
+                        continue;
+                    }
+                }
             }
             else if (obj->GetTypeId() == TYPEID_GAMEOBJECT)
             {

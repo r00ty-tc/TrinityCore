@@ -1457,10 +1457,22 @@ bool Creature::LoadCreatureFromDB(ObjectGuid::LowType spawnId, Map* map, bool ad
     }
 
     m_spawnId = spawnId;
+
     m_respawnCompatibilityMode = data->groupdata ? (data->groupdata->flags & CREATUREGROUP_FLAG_COMPATIBILITY_MODE) : true;
     m_creatureData = data;
     m_respawnradius = data->spawndist;
     m_respawnDelay = data->spawntimesecs;
+
+    // Is the creature script objecting to us spawning? If yes, delay by one second (then re-check in ::Update)
+    if (CreatureTemplate const* templateData = sObjectMgr->GetCreatureTemplate(data->id))
+    {
+        if (!m_respawnCompatibilityMode && !m_respawnTime && !sScriptMgr->CanSpawn(spawnId, data->id, templateData, data, map))
+        {
+            SaveRespawnTime(1);
+            return false;
+        }
+    }
+
     if (!Create(map->GenerateLowGuid<HighGuid::Unit>(), map, data->phaseMask, data->id, data->posX, data->posY, data->posZ, data->orientation, data, 0U , !m_respawnCompatibilityMode))
         return false;
 
@@ -1471,9 +1483,12 @@ bool Creature::LoadCreatureFromDB(ObjectGuid::LowType spawnId, Map* map, bool ad
 
     m_respawnTime = GetMap()->GetCreatureRespawnTime(m_spawnId);
 
-    // Is the creature script objecting to us spawning? If yes, delay by one second (then re-check in ::Update)
-    if (!m_respawnTime && !sScriptMgr->CanSpawn(spawnId, GetEntry(), GetCreatureTemplate(), GetCreatureData(), map))
-        m_respawnTime = time(NULL)+1;
+    if (m_respawnCompatibilityMode)
+    {
+        // Is the creature script objecting to us spawning? If yes, delay by one second (then re-check in ::Update)
+        if (!m_respawnCompatibilityMode && !m_respawnTime && !sScriptMgr->CanSpawn(spawnId, GetEntry(), GetCreatureTemplate(), GetCreatureData(), map))
+            m_respawnTime = time(NULL) + 1;
+    }
 
     if (m_respawnTime)                          // respawn on Update
     {

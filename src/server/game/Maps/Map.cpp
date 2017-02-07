@@ -3140,7 +3140,7 @@ void Map::RespawnCreatureList(RespawnVector const& RespawnData, bool force)
             if (!force && poolid)
             {
                 sPoolMgr->UpdatePool<Creature>(poolid, ri->spawnId);
-                RemoveCreatureRespawnTime(ri->spawnDelay);
+                RemoveCreatureRespawnTime(ri->spawnId);
             }
             else
             {
@@ -3152,12 +3152,20 @@ void Map::RespawnCreatureList(RespawnVector const& RespawnData, bool force)
 
                     GridCoord thisGrid = Trinity::ComputeGridCoord(cdata->posX, cdata->posY);
 
-                    // Only actually spawn if the grid is loaded, if not it'll be spawned anyway when the grid is loaded
-                    if (IsGridLoaded(thisGrid))
+                    CreatureTemplate const* templateData = sObjectMgr->GetCreatureTemplate(cdata->id);
+                    if (templateData && !sScriptMgr->CanSpawn(spawnId, cdata->id, templateData, cdata, this))
                     {
-                        Creature* obj = new Creature();
-                        if (!obj->LoadCreatureFromDB(spawnId, this, true))
-                            delete obj;
+                        SaveCreatureRespawnTime(c_guid.GetCounter(), c_guid.GetEntry(), time(NULL) + 1, ri->cellAreaZoneId, ri->gridId, true, true, trans);
+                    }
+                    else
+                    {
+                        // Only actually spawn if the grid is loaded, if not it'll be spawned anyway when the grid is loaded
+                        if (IsGridLoaded(thisGrid))
+                        {
+                            Creature* obj = new Creature();
+                            if (!obj->LoadCreatureFromDB(spawnId, this, true))
+                                delete obj;
+                        }
                     }
                 }
             }
