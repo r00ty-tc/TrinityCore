@@ -91,4 +91,10 @@ void WorldDatabaseConnection::DoPrepareStatements()
     PrepareStatement(WORLD_DEL_DISABLES, "DELETE FROM disables WHERE entry = ? AND sourceType = ?", CONNECTION_ASYNC);
     PrepareStatement(WORLD_UPD_CREATURE_ZONE_AREA_DATA, "UPDATE creature SET zoneId = ?, areaId = ? WHERE guid = ?", CONNECTION_ASYNC);
     PrepareStatement(WORLD_UPD_GAMEOBJECT_ZONE_AREA_DATA, "UPDATE gameobject SET zoneId = ?, areaId = ? WHERE guid = ?", CONNECTION_ASYNC);
+    PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_TEMPLATE, "SELECT poolId, phaseMask, spawnMask, minLimit, maxLimit, description FROM mappool_creature_template WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_TEMPLATE, "SELECT poolId, phaseMask, spawnMask, minLimit, maxLimit, description FROM mappool_gameobject_template WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_SPAWNS, "SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride FROM mappool_creature_spawns WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_SPAWNS, "SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, rotation0, rotation1, rotation2, rotation3, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride FROM mappool_gameobject_spawns WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_INFO, "SELECT poolId, creatureId, creatureQualifier, chance, modelId, equipmentId, spawntimeSecs, corpsetimeSecsLoot, corpsetimeSecsNoLoot, spawnDist, currentWaypoint, curHealth, curMana, MovementType, npcFlag, unitFlags, dynamicFlags, AINameOverride, ScriptNameOverride FROM mappool_creature_info WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_INFO, "SELECT poolId, gameobjectId, gameobjectQualifier, chance, animProgress, state, AINameOverride, ScriptNameOverride FROM mappool_gameobject_info WHERE map = ?", CONNECTION_SYNCH);
 }

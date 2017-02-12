@@ -33,7 +33,6 @@
 #include "ObjectMgr.h"
 #include "Pet.h"
 #include "PoolMgr.h"
-#include "MapPoolMgr.h"
 #include "ScriptMgr.h"
 #include "Transport.h"
 #include "Vehicle.h"
