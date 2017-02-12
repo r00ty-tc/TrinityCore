@@ -1458,7 +1458,9 @@ CREATE TABLE `creature_respawn` (
   `respawnTime` bigint(20) unsigned NOT NULL DEFAULT '0',
   `mapId` smallint(10) unsigned NOT NULL DEFAULT '0',
   `instanceId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Instance Identifier',
-  PRIMARY KEY (`guid`,`instanceId`),
+  `poolId` mediumint(8) unsigned NOT NULL DEFAULT '0',
+  `pointId` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`guid`, `instanceId`, `poolId`),
   KEY `idx_instance` (`instanceId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Grid Loading System';
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1532,7 +1534,9 @@ CREATE TABLE `gameobject_respawn` (
   `respawnTime` bigint(20) unsigned NOT NULL DEFAULT '0',
   `mapId` smallint(10) unsigned NOT NULL DEFAULT '0',
   `instanceId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Instance Identifier',
-  PRIMARY KEY (`guid`,`instanceId`),
+  `poolId` MEDIUMINT(8) UNSIGNED NOT NULL DEFAULT '0',
+  `pointId` INT(10) UNSIGNED NOT NULL DEFAULT '0',
+  PRIMARY KEY (`guid`, `instanceId`, `poolId`),
   KEY `idx_instance` (`instanceId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Grid Loading System';
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -2631,7 +2635,8 @@ INSERT INTO `updates` VALUES
 ('2018_11_09_00_characters.sql','50429D68E6EBD1149CDA14A9EA642BC06A1FAE3D','ARCHIVED','2018-11-09 20:49:47',0),
 ('2019_03_19_00_characters.sql','1FD394E354CB9E854ABDC8CFD02329240AE07C3F','ARCHIVED','2019-03-19 07:17:45',5),
 ('2019_04_15_00_characters.sql','942FB57BF890E523B35B9BFEF3686CB0AA52B795','ARCHIVED','2019-04-15 06:16:09',5),
-('2019_05_15_00_characters.sql','A12F21C8044C8BC8E2AA17F4C6CEB8B722CBC714','ARCHIVED','2019-05-15 06:13:20',5);
+('2019_05_15_00_characters.sql','A12F21C8044C8BC8E2AA17F4C6CEB8B722CBC714','ARCHIVED','2019-05-15 06:13:20',5),
+('2019_06_03_00_characters.sql','B3F00D349D9385CACCFEBDDC02CE6918EC85AF2E','ARCHIVED','2019-06-03 23:49:20',0);
 /*!40000 ALTER TABLE `updates` ENABLE KEYS */;
 UNLOCK TABLES;
 

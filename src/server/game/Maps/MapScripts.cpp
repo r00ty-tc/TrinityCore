@@ -310,6 +310,20 @@ inline GameObject* Map::_FindGameObject(WorldObject* searchObject, ObjectGuid::L
     return bounds.first->second;
 }
 
+RespawnInfo* Map::GetFirstPoolRespawn(uint32 poolId)
+{
+    std::vector<RespawnInfo*> respawns;
+    if (!GetPoolRespawnInfo(poolId, respawns))
+        return nullptr;
+
+    RespawnInfo* lowest = nullptr;
+    for (RespawnInfo* respawn : respawns)
+        if (!lowest || respawn->respawnTime < lowest->respawnTime)
+            lowest = respawn;
+
+    return lowest;
+}
+
 /// Process queued scripts
 void Map::ScriptsProcess()
 {

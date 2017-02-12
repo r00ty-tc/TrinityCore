@@ -770,6 +770,9 @@ INSERT INTO `rbac_linked_permissions` VALUES
 (196,871),
 (196,872),
 (196,873),
+(196,877),
+(196,878),
+(196,879),
 (197,232),
 (197,236),
 (197,237),
@@ -865,6 +868,9 @@ INSERT INTO `rbac_linked_permissions` VALUES
 (197,863),
 (197,864),
 (197,865),
+(197,875),
+(197,876),
+(197,880),
 (198,218),
 (198,300),
 (198,312),
@@ -1647,7 +1653,14 @@ INSERT INTO `rbac_permissions` VALUES
 (871,'Command: debug instancespawn'),
 (872,'Command: server debug'),
 (873,'Command: reload creature_movement_override'),
-(874,'Command: debug asan');
+(874,'Command: debug asan'),
+(875,'Command: pool'),
+(876,'Command: pool dump'),
+(877,'Command: pool respawn'),
+(878,'Command: pool despawn'),
+(879,'Command: pool reseed'),
+(880,'Command: pool list');
+
 /*!40000 ALTER TABLE `rbac_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1780,7 +1793,9 @@ INSERT INTO `updates` VALUES
 ('2019_03_19_00_auth.sql','03BA8CFC60ACD5B874840A3E50F11CD2643730A0','ARCHIVED','2019-03-19 07:17:45',5),
 ('2019_04_15_00_auth.sql','EC67389946A24BFAA226B9DFCFEDB3BA095B4C42','ARCHIVED','2019-04-15 06:16:09',5),
 ('2019_04_27_00_auth.sql','84B1EB9CC9B09BAF55E6295D202EC57D99B1B60E','ARCHIVED','2019-04-27 18:07:18',0),
-('2019_05_15_00_auth.sql','8A7B96E66D689DA63380654142FF60A1EE938697','ARCHIVED','2019-05-15 06:13:20',5);
+('2019_05_15_00_auth.sql','8A7B96E66D689DA63380654142FF60A1EE938697','ARCHIVED','2019-05-15 06:13:20',5),
+('2019_06_03_00_auth.sql','519EEE1B02FBBA679ACFC0136201E807739A7AF7','ARCHIVED','2019-06-04 23:30:29',234);
+
 /*!40000 ALTER TABLE `updates` ENABLE KEYS */;
 UNLOCK TABLES;
 

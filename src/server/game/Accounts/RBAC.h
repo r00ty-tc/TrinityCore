@@ -772,6 +772,12 @@ enum RBACPermissions
     RBAC_PERM_COMMAND_SERVER_DEBUG                           = 872,
     RBAC_PERM_COMMAND_RELOAD_CREATURE_MOVEMENT_OVERRIDE      = 873,
     RBAC_PERM_COMMAND_DEBUG_ASAN                             = 874,
+    RBAC_PERM_COMMAND_POOL                                   = 875,
+    RBAC_PERM_COMMAND_POOL_DUMP                              = 876,
+    RBAC_PERM_COMMAND_POOL_RESPAWN                           = 877,
+    RBAC_PERM_COMMAND_POOL_DESPAWN                           = 878,
+    RBAC_PERM_COMMAND_POOL_RESEED                            = 879,
+    RBAC_PERM_COMMAND_POOL_LIST                              = 880,
     //
     // IF YOU ADD NEW PERMISSIONS, ADD THEM IN MASTER BRANCH AS WELL!
     //

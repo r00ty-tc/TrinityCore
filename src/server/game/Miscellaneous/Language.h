@@ -1051,7 +1051,24 @@ enum TrinityStrings
     LANG_LIST_RESPAWNS_GAMEOBJECTS        = 5082,
     LANG_OBJECTINFO_AITYPE                = 5083,
 
-    // Room for more Trinity strings        5084-6603
+    // Strings for Map based pooling        5084-5099
+    LANG_POOL_INVALID_MAP_ID              = 5084,
+    LANG_POOL_INVALID_POOL_ID             = 5085,
+    LANG_POOL_RESPAWNED_ENTRIES           = 5086,
+    LANG_POOL_DESPAWNED_ENTRIES           = 5087,
+    LANG_POOL_RESEEDED_ENTRIES            = 5088,
+    LANG_POOL_LIST_ROOT_POOLS_MAP         = 5089,
+    LANG_POOL_MINMAX_SPAWNED              = 5090,
+    LANG_POOL_NOT_ROOT_USING_ROOT_POOL    = 5091,
+    LANG_POOL_DUMPING_DATA                = 5092,
+    LANG_POOL_NOTFOUND_IN_MAP             = 5093,
+    LANG_POOL_BASEMAP_NOTFOUND            = 5094,
+    LANG_POOL_DUMP_HEADER                 = 5095,
+    LANG_POOL_POINT_CREATURE              = 5096,
+    LANG_POOL_POINT_GO                    = 5097,
+    LANG_POOL_POINT_CREATURE_NOGRID       = 5098,
+    LANG_POOL_POINT_GO_NOGRID             = 5099,
+    // Room for more Trinity strings        5100-6603
 
     // Level requirement notifications
     LANG_SAY_REQ                          = 6604,

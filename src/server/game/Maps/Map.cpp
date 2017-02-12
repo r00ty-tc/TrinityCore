@@ -32,6 +32,7 @@
 #include "Log.h"
 #include "MapInstanced.h"
 #include "MapManager.h"
+#include "MapPoolMgr.h"
 #include "MMapFactory.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
@@ -83,6 +84,11 @@ Map::~Map()
 
     if (!m_scriptSchedule.empty())
         sMapMgr->DecreaseScheduledScriptCount(m_scriptSchedule.size());
+
+    delete sMapPoolMgr;
+    for (auto spawnItr : m_spawnPoints)
+        delete spawnItr.second;
+    m_spawnPoints.clear();
 
     MMAP::MMapFactory::createOrGetMMapManager()->unloadMapInstance(GetId(), i_InstanceId);
 }
@@ -283,6 +289,9 @@ i_scriptLock(false), _respawnCheckTimer(0), _defaultLight(GetDefaultMapLight(id)
     Map::InitVisibilityDistance();
 
     sScriptMgr->OnCreateMap(this);
+    LoadSpawnPoints();
+    sMapPoolMgr = new MapPoolMgr(this);
+    sMapPoolMgr->LoadMapPools();
 }
 
 void Map::InitVisibilityDistance()
@@ -527,6 +536,7 @@ bool Map::EnsureGridLoaded(Cell const& cell)
 
         ObjectGridLoader loader(*grid, this, cell);
         loader.LoadN();
+        ProcessSpawnPointsForGrid(GridCoord(cell.GridX(), cell.GridY()).GetId());
 
         Balance();
         return true;
@@ -534,6 +544,16 @@ bool Map::EnsureGridLoaded(Cell const& cell)
 
     return false;
 }
+
+void Map::ProcessSpawnPointsForGrid(uint32 gridId) const
+{
+    if (std::vector<MapPoolSpawnPoint*> const* spawnPoints = GetSpawnPointsInGrid(gridId))
+    {
+        for (MapPoolSpawnPoint* spawnPoint : *spawnPoints)
+            GetMapPoolMgr()->SpawnPendingPoint(spawnPoint);
+    }
+}
+
 
 void Map::GridMarkNoUnload(uint32 x, uint32 y)
 {
@@ -3044,7 +3064,7 @@ void Map::Respawn(RespawnInfo* info, bool force, SQLTransaction dbTrans)
     if (!force && !CheckRespawn(info))
     {
         if (info->respawnTime)
-            SaveRespawnTime(info->type, info->spawnId, info->entry, info->respawnTime, info->zoneId, info->gridId, true, true, dbTrans);
+            SaveRespawnTime(info->type, info->spawnId, info->entry, info->respawnTime, info->zoneId, info->poolId, info->lastPoolPointId, info->gridId, true, true, dbTrans);
         else
             RemoveRespawnTime(info);
         return;
@@ -3069,29 +3089,41 @@ void Map::Respawn(std::vector<RespawnInfo*>& respawnData, bool force, SQLTransac
 
 void Map::AddRespawnInfo(RespawnInfo& info, bool replace)
 {
-    if (!info.spawnId)
+    if (!info.spawnId & !info.poolId)
         return;
 
-    RespawnInfoMap& bySpawnIdMap = GetRespawnMapForType(info.type);
-
-    auto it = bySpawnIdMap.find(info.spawnId);
-    if (it != bySpawnIdMap.end()) // spawnid already has a respawn scheduled
+    if (!info.poolId)
     {
-        RespawnInfo* const existing = it->second;
-        if (replace || info.respawnTime < existing->respawnTime) // delete existing in this case
-            DeleteRespawnInfo(existing);
-        else // don't delete existing, instead replace respawn time so caller saves the correct time
+        RespawnInfoMap& bySpawnIdMap = GetRespawnMapForType(info.type);
+
+        auto it = bySpawnIdMap.find(info.spawnId);
+        if (it != bySpawnIdMap.end()) // spawnid already has a respawn scheduled
         {
-            info.respawnTime = existing->respawnTime;
-            return;
+            RespawnInfo* const existing = it->second;
+            if (replace || info.respawnTime < existing->respawnTime) // delete existing in this case
+                DeleteRespawnInfo(existing);
+            else // don't delete existing, instead replace respawn time so caller saves the correct time
+            {
+                info.respawnTime = existing->respawnTime;
+                return;
+            }
         }
+
+        // if we get to this point, we should insert the respawninfo (there either was no prior entry, or it was deleted already)
+        RespawnInfo * ri = new RespawnInfo(info);
+        ri->handle = _respawnTimes.push(ri);
+        bool success = bySpawnIdMap.emplace(ri->spawnId, ri).second;
+        ASSERT(success, "Insertion of respawn info with id (%u,%u) into spawn id map failed - state desync.", uint32(ri->type), ri->spawnId);
+    }
+    else
+    {
+        // if we get to this point, we should insert the respawninfo (there either was no prior entry, or it was deleted already)
+        RespawnInfo * ri = new RespawnInfo(info);
+        ri->handle = _respawnTimes.push(ri);
+        bool success = _RespawnTimesByPoolId.emplace(ri->poolId, ri)->second;
+        ASSERT(success, "Insertion of respawn info with id (%u,%u) into spawn id map failed - state desync.", uint32(ri->type), ri->spawnId);
     }
 
-    // if we get to this point, we should insert the respawninfo (there either was no prior entry, or it was deleted already)
-    RespawnInfo * ri = new RespawnInfo(info);
-    ri->handle = _respawnTimes.push(ri);
-    bool success = bySpawnIdMap.emplace(ri->spawnId, ri).second;
-    ASSERT(success, "Insertion of respawn info with id (%u,%u) into spawn id map failed - state desync.", uint32(ri->type), ri->spawnId);
 }
 
 static void PushRespawnInfoFrom(std::vector<RespawnInfo*>& data, RespawnInfoMap const& map, uint32 zoneId)
@@ -3117,6 +3149,19 @@ RespawnInfo* Map::GetRespawnInfo(SpawnObjectType type, ObjectGuid::LowType spawn
     return it->second;
 }
 
+bool Map::GetPoolRespawnInfo(uint32 poolId, std::vector<RespawnInfo*>& ri)
+{
+    uint32 rootPoolId = sMapPoolMgr->GetRootPoolId(poolId);
+    auto bounds = _RespawnTimesByPoolId.equal_range(rootPoolId);
+    if (bounds.first == bounds.second)
+        return false;
+
+    for (auto itr = bounds.first; itr != bounds.second; ++itr)
+        ri.push_back(itr->second);
+
+    return true;
+}
+
 void Map::DeleteRespawnInfo() // delete everything
 {
     for (RespawnInfo* info : _respawnTimes)
@@ -3124,6 +3169,7 @@ void Map::DeleteRespawnInfo() // delete everything
     _respawnTimes.clear();
     _creatureRespawnTimesBySpawnId.clear();
     _gameObjectRespawnTimesBySpawnId.clear();
+    _RespawnTimesByPoolId.clear();
 }
 
 void Map::DeleteRespawnInfo(RespawnInfo* info)
@@ -3132,8 +3178,23 @@ void Map::DeleteRespawnInfo(RespawnInfo* info)
     ASSERT(info);
 
     // spawnid store
-    size_t const n = GetRespawnMapForType(info->type).erase(info->spawnId);
-    ASSERT(n == 1, "Respawn stores inconsistent for map %u, spawnid %u (type %u)", GetId(), info->spawnId, uint32(info->type));
+    if (!info->poolId)
+    {
+        size_t const n = GetRespawnMapForType(info->type).erase(info->spawnId);
+        ASSERT(n == 1, "Respawn stores inconsistent for map %u, spawnid %u (type %u)", GetId(), info->spawnId, uint32(info->type));
+    }
+    else
+    {
+        auto bounds = _RespawnTimesByPoolId.equal_range(info->poolId);
+        for (auto itr = bounds.first; itr != bounds.second; ++itr)
+        {
+            if (itr->second == info)
+            {
+                _RespawnTimesByPoolId.erase(itr);
+                break;
+            }
+        }
+    }
 
     //respawn heap
     _respawnTimes.erase(info->handle);
@@ -3148,18 +3209,28 @@ void Map::RemoveRespawnTime(RespawnInfo* info, bool doRespawn, SQLTransaction db
     switch (info->type)
     {
         case SPAWN_TYPE_CREATURE:
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN);
+            if (info->poolId)
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN_BYPOOL);
+            else
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN);
             break;
         case SPAWN_TYPE_GAMEOBJECT:
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
+            if (info->poolId)
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN_BYPOOL);
+            else
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
             break;
         default:
             ASSERT(false, "Invalid respawninfo type %u for spawnid %u map %u", uint32(info->type), info->spawnId, GetId());
             return;
     }
+
     stmt->setUInt32(0, info->spawnId);
     stmt->setUInt16(1, GetId());
     stmt->setUInt32(2, GetInstanceId());
+    if (info->poolId)
+        stmt->setUInt32(3, info->poolId);
+
     CharacterDatabase.ExecuteOrAppend(dbTrans, stmt);
 
     if (doRespawn)
@@ -3168,11 +3239,45 @@ void Map::RemoveRespawnTime(RespawnInfo* info, bool doRespawn, SQLTransaction db
         DeleteRespawnInfo(info);
 }
 
-void Map::RemoveRespawnTime(std::vector<RespawnInfo*>& respawnData, bool doRespawn, SQLTransaction dbTrans)
+void Map::RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, SQLTransaction dbTrans) const
+{
+    if (MapPoolEntry const* pool = sMapPoolMgr->GetPool(poolId))
+    {
+        SQLTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
+        PreparedStatement* stmt;
+        if (pool->GetPoolType() == POOLTYPE_CREATURE)
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN_BYPOOL);
+        else
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN_BYPOOL);
+
+        stmt->setUInt32(0, spawnCounter);
+        stmt->setUInt16(1, GetId());
+        stmt->setUInt32(2, GetInstanceId());
+        stmt->setUInt32(3, poolId);
+
+        CharacterDatabase.ExecuteOrAppend(trans, stmt);
+        if (!dbTrans)
+            CharacterDatabase.CommitTransaction(trans);
+    }
+}
+
+void Map::RemoveRespawnTime(RespawnVector& respawnData, bool doRespawn, SQLTransaction dbTrans)
 {
     SQLTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
     for (RespawnInfo* info : respawnData)
         RemoveRespawnTime(info, doRespawn, trans);
+    if (!dbTrans)
+        CharacterDatabase.CommitTransaction(trans);
+}
+
+void Map::RemovePoolRespawns(std::vector<RespawnInfo*>& respawnData, uint32 poolId, SQLTransaction dbTrans)
+{
+    SQLTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
+    for (RespawnInfo* info : respawnData)
+    {
+        if (info->poolId == poolId)
+            RemoveRespawnTime(info, false, trans);
+    }
     if (!dbTrans)
         CharacterDatabase.CommitTransaction(trans);
 }
@@ -3185,7 +3290,23 @@ void Map::ProcessRespawns()
         RespawnInfo* next = _respawnTimes.top();
         if (now < next->respawnTime) // done for this tick
             break;
-        if (CheckRespawn(next)) // see if we're allowed to respawn
+        if (next->poolId)
+        {
+            if (!GetMapPoolMgr()->SpawnPool(next->poolId, 1))
+                TC_LOG_ERROR("maps.pool", "[Map %u] Unable to spawn object for pool %u.", GetId(), next->poolId);
+
+            auto bounds = _RespawnTimesByPoolId.equal_range(next->poolId);
+            for (auto itr = bounds.first; itr != bounds.second;++itr)
+            {
+                if (itr->second == next)
+                {
+                    _RespawnTimesByPoolId.erase(itr);
+                    break;
+                }
+            }
+            RemoveRespawnTime(next, false);
+        }
+        else if (CheckRespawn(next)) // see if we're allowed to respawn
         {
             // ok, respawn
             _respawnTimes.pop();
@@ -4295,29 +4416,32 @@ void Map::UpdateIteratorBack(Player* player)
         m_mapRefIter = m_mapRefIter->nocheck_prev();
 }
 
-void Map::SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 zoneId, uint32 gridId, bool writeDB, bool replace, SQLTransaction dbTrans)
+void Map::SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 zoneId, uint32 poolId, uint32 lastSpawnPoint, uint32 gridId, bool writeDB, bool replace, SQLTransaction dbTrans)
 {
     if (!respawnTime)
     {
         // Delete only
-        RemoveRespawnTime(type, spawnId, false, dbTrans);
+        if (!poolId)
+            RemoveRespawnTime(type, spawnId, false, dbTrans);
         return;
     }
 
     RespawnInfo ri;
     ri.type = type;
-    ri.spawnId = spawnId;
     ri.entry = entry;
     ri.respawnTime = respawnTime;
     ri.gridId = gridId;
     ri.zoneId = zoneId;
+    ri.spawnId = spawnId;
+    ri.poolId = poolId;
+    ri.lastPoolPointId = lastSpawnPoint;
     AddRespawnInfo(ri, replace);
 
     if (writeDB)
-        SaveRespawnTimeDB(type, spawnId, ri.respawnTime, dbTrans); // might be different from original respawn time if we didn't replace
+        SaveRespawnTimeDB(type, spawnId, ri.respawnTime, poolId, lastSpawnPoint, dbTrans); // might be different from original respawn time if we didn't replace
 }
 
-void Map::SaveRespawnTimeDB(SpawnObjectType type, ObjectGuid::LowType spawnId, time_t respawnTime, SQLTransaction dbTrans)
+void Map::SaveRespawnTimeDB(SpawnObjectType type, ObjectGuid::LowType spawnId, time_t respawnTime, uint32 poolId, uint32 pointId, SQLTransaction dbTrans)
 {
     // Just here for support of compatibility mode
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement((type == SPAWN_TYPE_GAMEOBJECT) ? CHAR_REP_GO_RESPAWN : CHAR_REP_CREATURE_RESPAWN);
@@ -4325,6 +4449,8 @@ void Map::SaveRespawnTimeDB(SpawnObjectType type, ObjectGuid::LowType spawnId, t
     stmt->setUInt64(1, uint64(respawnTime));
     stmt->setUInt16(2, GetId());
     stmt->setUInt32(3, GetInstanceId());
+    stmt->setUInt32(4, poolId);
+    stmt->setUInt32(5, pointId);
     CharacterDatabase.ExecuteOrAppend(dbTrans, stmt);
 }
 
@@ -4340,9 +4466,26 @@ void Map::LoadRespawnTimes()
             Field* fields = result->Fetch();
             ObjectGuid::LowType loguid = fields[0].GetUInt32();
             uint64 respawnTime = fields[1].GetUInt64();
+            uint32 poolId = fields[2].GetUInt32();
+            uint32 pointId = fields[3].GetUInt32();
 
-            if (CreatureData const* cdata = sObjectMgr->GetCreatureData(loguid))
-                SaveRespawnTime(SPAWN_TYPE_CREATURE, loguid, cdata->id, time_t(respawnTime), GetZoneId(cdata->spawnPoint), Trinity::ComputeGridCoord(cdata->spawnPoint.GetPositionX(), cdata->spawnPoint.GetPositionY()).GetId(), false);
+            if (poolId)
+            {
+                if (poolId != sMapPoolMgr->GetRootPoolId(poolId))
+                {
+                    TC_LOG_ERROR("maps.pool", "Attempted to load respawn for pool %u, which is not the root pool %u ignored and removed", poolId, sMapPoolMgr->GetRootPoolId(poolId));
+                    RemoveRespawnTime(poolId, loguid);
+                }
+                else if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
+                {
+                    // Not the best way to handle this, but need to keep spawn counter low
+                    RemoveRespawnTime(poolId, loguid);
+                    Position pos = Position(spawnPoint->positionX, spawnPoint->positionY, spawnPoint->positionZ, spawnPoint->positionO);
+                    SaveRespawnTime(SPAWN_TYPE_CREATURE, sMapPoolMgr->GetRespawnCounter(poolId), 0, time_t(respawnTime), GetZoneId(pos), poolId, pointId, Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), true);
+                }
+            }
+            else if (CreatureData const* cdata = sObjectMgr->GetCreatureData(loguid))
+                SaveRespawnTime(SPAWN_TYPE_CREATURE, loguid, cdata->id, time_t(respawnTime), GetZoneId(cdata->spawnPoint), 0, 0, Trinity::ComputeGridCoord(cdata->spawnPoint.GetPositionX(), cdata->spawnPoint.GetPositionY()).GetId(), false);
 
         } while (result->NextRow());
     }
@@ -4357,9 +4500,26 @@ void Map::LoadRespawnTimes()
             Field* fields = result->Fetch();
             ObjectGuid::LowType loguid = fields[0].GetUInt32();
             uint64 respawnTime = fields[1].GetUInt64();
+            uint32 poolId = fields[2].GetUInt32();
+            uint32 pointId = fields[3].GetUInt32();
 
-            if (GameObjectData const* godata = sObjectMgr->GetGameObjectData(loguid))
-                SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, loguid, godata->id, time_t(respawnTime), GetZoneId(godata->spawnPoint), Trinity::ComputeGridCoord(godata->spawnPoint.GetPositionX(), godata->spawnPoint.GetPositionY()).GetId(), false);
+            if (poolId)
+            {
+                if (poolId != sMapPoolMgr->GetRootPoolId(poolId))
+                {
+                    TC_LOG_ERROR("maps.pool", "Attempted to load respawn for pool %u, which is not the root pool %u ignored and removed", poolId, sMapPoolMgr->GetRootPoolId(poolId));
+                    RemoveRespawnTime(poolId, loguid);
+                }
+                else if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
+                {
+                    // Not the best way to handle this, but need to keep spawn counter low
+                    RemoveRespawnTime(poolId, loguid);
+                    Position pos = Position(spawnPoint->positionX, spawnPoint->positionY, spawnPoint->positionZ, spawnPoint->positionO);
+                    SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, sMapPoolMgr->GetRespawnCounter(poolId), 0, time_t(respawnTime), GetZoneId(pos), poolId, pointId, Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), false);
+                }
+            }
+            else if (GameObjectData const* godata = sObjectMgr->GetGameObjectData(loguid))
+                SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, loguid, godata->id, time_t(respawnTime), GetZoneId(godata->spawnPoint), 0, 0, Trinity::ComputeGridCoord(godata->spawnPoint.GetPositionX(), godata->spawnPoint.GetPositionY()).GetId(), false);
 
         } while (result->NextRow());
     }
@@ -4392,6 +4552,68 @@ time_t Map::GetLinkedRespawnTime(ObjectGuid guid) const
     }
 
     return time_t(0);
+}
+
+MapPoolSpawnPoint* Map::GetSpawnPoint(uint32 pointId)
+{
+    PoolSpawnPointMap::iterator spawnPoint = m_spawnPoints.find(pointId);
+    if (spawnPoint == m_spawnPoints.end())
+        return nullptr;
+
+    return spawnPoint->second;
+}
+
+void Map::LoadSpawnPoints()
+{
+    TC_LOG_INFO("server.loading", "[Map %u] Loading Spawn Point Data for pooling...", GetId());
+    // Read Creature Pool Spawnpoints
+    //        0       1        2       3       4          5          6          7            8                    9               10                       11
+    // SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride FROM mappool_creature_spawns WHERE map = ?
+    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_SPAWNPOINTS);
+    stmt->setUInt32(0, GetId());
+    if (PreparedQueryResult result = WorldDatabase.Query(stmt))
+    {
+        uint32 spawnPoints = 0;
+        do
+        {
+            Field* fields = result->Fetch();
+
+            // Create new spawn/populate
+            MapPoolSpawnPoint* thisSpawn = new MapPoolSpawnPoint();
+            thisSpawn->mapId = GetId();
+            thisSpawn->pointId = fields[0].GetUInt32();
+            thisSpawn->zoneId = fields[1].GetUInt16();
+            thisSpawn->areaId = fields[2].GetUInt16();
+            thisSpawn->gridId = fields[3].GetUInt32();
+            thisSpawn->positionX = fields[4].GetFloat();
+            thisSpawn->positionY = fields[5].GetFloat();
+            thisSpawn->positionZ = fields[6].GetFloat();
+            thisSpawn->positionO = fields[7].GetFloat();
+            thisSpawn->rotation0 = fields[8].GetFloat();
+            thisSpawn->rotation1 = fields[9].GetFloat();
+            thisSpawn->rotation2 = fields[10].GetFloat();
+            thisSpawn->rotation3 = fields[11].GetFloat();
+            thisSpawn->creatureOverride = nullptr;
+            thisSpawn->gameObjectOverride = nullptr;
+            thisSpawn->currentObject = nullptr;
+            thisSpawn->currentItem = nullptr;
+            thisSpawn->oldObjects.clear();
+
+            // Add this spawn
+            m_spawnPoints[thisSpawn->pointId] = thisSpawn;
+
+            // Add to cell list
+            GridCoord grid = Trinity::ComputeGridCoord(thisSpawn->positionX, thisSpawn->positionY);
+            _spawnPointsByGrid[grid.GetId()].push_back(thisSpawn);
+            ++spawnPoints;
+        } while (result->NextRow());
+
+        TC_LOG_INFO("server.loading", "[Map %u] Loaded %u Spawn points", GetId(), spawnPoints);
+    }
+    else
+    {
+        TC_LOG_INFO("server.loading", "[Map %u] No spawn point data found", GetId());
+    }
 }
 
 void Map::LoadCorpseData()

@@ -1,0 +1,11 @@
+ALTER TABLE `creature_respawn`
+	ADD COLUMN `poolId` MEDIUMINT(8) UNSIGNED NOT NULL DEFAULT '0' AFTER `instanceId`,
+	ADD COLUMN `pointId` INT(10) UNSIGNED NOT NULL DEFAULT '0' AFTER `poolId`,
+	DROP PRIMARY KEY,
+	ADD PRIMARY KEY (`guid`, `instanceId`, `poolId`);
+
+ALTER TABLE `gameobject_respawn`
+	ADD COLUMN `poolId` MEDIUMINT(8) UNSIGNED NOT NULL DEFAULT '0' AFTER `instanceId`,
+	ADD COLUMN `pointId` INT(10) UNSIGNED NOT NULL DEFAULT '0' AFTER `poolId`,
+	DROP PRIMARY KEY,
+	ADD PRIMARY KEY (`guid`, `instanceId`, `poolId`);

@@ -29,6 +29,7 @@
 #include "ObjectMgr.h"
 #include "World.h"
 #include "ScriptMgr.h"
+#include "MapPoolMgr.h"
 
 void ObjectGridEvacuator::Visit(CreatureMapType &m)
 {
@@ -240,7 +241,7 @@ void ObjectGridUnloader::Visit(GridRefManager<T> &m)
         //So we need this even after cleaner (maybe we can remove cleaner)
         //Example: Flame Leviathan Turret 33139 is summoned when a creature is deleted
         /// @todo Check if that script has the correct logic. Do we really need to summons something before deleting?
-        obj->CleanupsBeforeDelete();
+        obj->CleanupsBeforeDelete(true, true);
         ///- object will get delinked from the manager when deleted
         delete obj;
     }
@@ -265,7 +266,7 @@ template<class T>
 void ObjectGridCleaner::Visit(GridRefManager<T> &m)
 {
     for (typename GridRefManager<T>::iterator iter = m.begin(); iter != m.end(); ++iter)
-        iter->GetSource()->CleanupsBeforeDelete();
+        iter->GetSource()->CleanupsBeforeDelete(true, true);
 }
 
 template void ObjectGridUnloader::Visit(CreatureMapType &);

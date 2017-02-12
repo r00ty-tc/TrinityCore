@@ -35,6 +35,9 @@ class Quest;
 class Player;
 class SpellInfo;
 class WorldSession;
+class MapPoolEntry;
+struct MapPoolSpawnPoint;
+struct MapPoolCreature;
 
 enum MovementGeneratorType : uint8;
 
@@ -62,6 +65,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 {
     public:
         explicit Creature(bool isWorldObject = false);
+        virtual ~Creature();
 
         void AddToWorld() override;
         void RemoveFromWorld() override;
@@ -196,7 +200,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         void setDeathState(DeathState s) override;                   // override virtual Unit::setDeathState
 
-        bool LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate);
+        bool LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate, CreatureData* cData = nullptr);
         void SaveToDB();
                                                             // overriden in Pet
         virtual void SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask);
@@ -358,6 +362,15 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         bool IsEscortNPC(bool onlyIfActive = true);
 
         bool CanGiveExperience() const;
+        void SetPoolData(MapPoolEntry* pool, MapPoolSpawnPoint* spawnPoint, MapPoolCreature* cEntry)
+        {
+            m_poolEntry = pool;
+            m_poolPoint = spawnPoint;
+            m_poolCreature = cEntry;
+        }
+        MapPoolEntry const* GetPoolEntry() const { return m_poolEntry; }
+        MapPoolSpawnPoint const* GetPoolPoint() const { return m_poolPoint; }
+        MapPoolCreature const* GetPoolCreature() const { return m_poolCreature; }
 
         void AtEnterCombat() override;
         void AtExitCombat() override;
@@ -415,6 +428,10 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         bool IsInvisibleDueToDespawn() const override;
         bool CanAlwaysSee(WorldObject const* obj) const override;
+
+        MapPoolEntry* m_poolEntry;
+        MapPoolSpawnPoint* m_poolPoint;
+        MapPoolCreature* m_poolCreature;
 
     private:
         void ForcedDespawn(uint32 timeMSToDespawn = 0, Seconds forceRespawnTimer = 0s);
