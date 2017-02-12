@@ -32,6 +32,7 @@
 #include "GameObjectModel.h"
 #include "ObjectGuid.h"
 #include "Transaction.h"
+#include "MapPoolMgr.h"
 
 #include <bitset>
 #include <list>
@@ -618,6 +619,8 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
             _updateObjects.erase(obj);
         }
 
+        MapPoolMgr* GetMapPoolMgr() { return &sMapPoolMgr; }
+
     private:
 
         void LoadMapAndVMap(int gx, int gy);
@@ -838,6 +841,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         std::unordered_set<Corpse*> _corpseBones;
 
         std::unordered_set<Object*> _updateObjects;
+        MapPoolMgr sMapPoolMgr;
 };
 
 enum InstanceResetMethod

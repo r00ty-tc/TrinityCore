@@ -20,7 +20,6 @@
 #include "Containers.h"
 #include "ObjectMgr.h"
 #include "Log.h"
-#include "MapManager.h"
 
 ////////////////////////////////////////////////////////////
 // template class ActivePoolData
