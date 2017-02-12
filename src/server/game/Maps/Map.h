@@ -52,9 +52,11 @@ class Object;
 class Player;
 class TempSummon;
 class Transport;
+class MapPoolMgr;
 class Unit;
 class WorldObject;
 class WorldPacket;
+class MapPoolMgr;
 struct MapDifficulty;
 struct MapEntry;
 struct Position;
@@ -278,6 +280,26 @@ struct ZoneDynamicInfo
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
 #define MAP_INVALID_ZONE      0xFFFFFFFF
 
+struct MapPoolSpawnPoint
+{
+    uint32 mapId;
+    uint32 pointId;
+    uint16 zoneId;
+    uint16 areaId;
+    uint32 gridId;
+    float positionX;
+    float positionY;
+    float positionZ;
+    float positionO;
+    float rotation0;
+    float rotation1;
+    float rotation2;
+    float rotation3;
+};
+typedef std::map<uint32, MapPoolSpawnPoint*> PoolSpawnPointMap;
+
+typedef std::map<uint32/*leaderDBGUID*/, CreatureGroup*>        CreatureGroupHolderType;
+
 struct RespawnInfo; // forward declaration
 struct CompareRespawnInfo
 {
@@ -292,6 +314,8 @@ struct RespawnInfo
     SpawnObjectType type;
     ObjectGuid::LowType spawnId;
     uint32 entry;
+    uint32 poolId;
+    uint32 lastPoolPointId;
     time_t respawnTime;
     uint32 gridId;
     uint32 zoneId;
@@ -312,6 +336,7 @@ inline bool CompareRespawnInfo::operator()(RespawnInfo const* a, RespawnInfo con
 class TC_GAME_API Map : public GridRefManager<NGridType>
 {
     friend class MapReference;
+    friend class MapPoolMgr;
     public:
         Map(uint32 id, time_t, uint32 InstanceId, uint8 SpawnMode, Map* _parent = nullptr);
         virtual ~Map();
@@ -627,6 +652,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         }
 
         virtual std::string GetDebugInfo() const;
+        MapPoolMgr* GetMapPoolMgr() const { return sMapPoolMgr; }
 
     private:
 
@@ -682,6 +708,9 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         void ScriptsProcess();
 
         void SendObjectUpdates();
+
+        MapPoolSpawnPoint* GetSpawnPoint(uint32 pointId);
+        void LoadSpawnPoints();
 
     protected:
         void SetUnloadReferenceLock(GridCoord const& p, bool on) { getNGrid(p.x_coord, p.y_coord)->setUnloadReferenceLock(on); }
@@ -742,6 +771,8 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         typedef std::multimap<time_t, ScriptAction> ScriptScheduleMap;
         ScriptScheduleMap m_scriptSchedule;
+
+        PoolSpawnPointMap m_spawnPoints;
 
     public:
         void ProcessRespawns();
@@ -883,6 +914,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         std::unordered_set<Object*> _updateObjects;
 
         MPSCQueue<FarSpellCallback> _farSpellCallbacks;
+        MapPoolMgr* sMapPoolMgr;
 };
 
 enum InstanceResetMethod

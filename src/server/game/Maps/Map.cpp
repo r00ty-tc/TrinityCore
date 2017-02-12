@@ -32,6 +32,7 @@
 #include "Log.h"
 #include "MapInstanced.h"
 #include "MapManager.h"
+#include "MapPoolMgr.h"
 #include "MMapFactory.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
@@ -83,6 +84,11 @@ Map::~Map()
 
     if (!m_scriptSchedule.empty())
         sMapMgr->DecreaseScheduledScriptCount(m_scriptSchedule.size());
+
+    delete sMapPoolMgr;
+    for (auto spawnItr : m_spawnPoints)
+        delete spawnItr.second;
+    m_spawnPoints.clear();
 
     MMAP::MMapFactory::createOrGetMMapManager()->unloadMapInstance(GetId(), i_InstanceId);
 }
@@ -283,6 +289,9 @@ i_scriptLock(false), _respawnCheckTimer(0), _defaultLight(GetDefaultMapLight(id)
     Map::InitVisibilityDistance();
 
     sScriptMgr->OnCreateMap(this);
+    LoadSpawnPoints();
+    sMapPoolMgr = new MapPoolMgr(this);
+    sMapPoolMgr->LoadMapPools();
 }
 
 void Map::InitVisibilityDistance()
@@ -4308,6 +4317,8 @@ void Map::SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uin
     ri.type = type;
     ri.spawnId = spawnId;
     ri.entry = entry;
+    ri.poolId = 0;
+    ri.lastPoolPointId = 0;
     ri.respawnTime = respawnTime;
     ri.gridId = gridId;
     ri.zoneId = zoneId;
@@ -4392,6 +4403,59 @@ time_t Map::GetLinkedRespawnTime(ObjectGuid guid) const
     }
 
     return time_t(0);
+}
+
+MapPoolSpawnPoint* Map::GetSpawnPoint(uint32 pointId)
+{
+    PoolSpawnPointMap::iterator spawnPoint = m_spawnPoints.find(pointId);
+    if (spawnPoint == m_spawnPoints.end())
+        return nullptr;
+
+    return spawnPoint->second;
+}
+
+void Map::LoadSpawnPoints()
+{
+    TC_LOG_INFO("server.loading", "[Map %u] Loading Spawn Point Data for pooling...", GetId());
+    // Read Creature Pool Spawnpoints
+    //        0       1        2       3       4          5          6          7            8                    9               10                       11
+    // SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride FROM mappool_creature_spawns WHERE map = ?
+    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_SPAWNPOINTS);
+    stmt->setUInt32(0, GetId());
+    if (PreparedQueryResult result = WorldDatabase.Query(stmt))
+    {
+        uint32 spawnPoints = 0;
+        do
+        {
+            Field* fields = result->Fetch();
+
+            // Create new spawn/populate
+            MapPoolSpawnPoint* thisSpawn = new MapPoolSpawnPoint();
+            thisSpawn->mapId = GetId();
+            thisSpawn->pointId = fields[0].GetUInt32();
+            thisSpawn->zoneId = fields[1].GetUInt16();
+            thisSpawn->areaId = fields[2].GetUInt16();
+            thisSpawn->gridId = fields[3].GetUInt32();
+            thisSpawn->positionX = fields[4].GetFloat();
+            thisSpawn->positionY = fields[5].GetFloat();
+            thisSpawn->positionZ = fields[6].GetFloat();
+            thisSpawn->positionO = fields[7].GetFloat();
+            thisSpawn->rotation0 = fields[8].GetFloat();
+            thisSpawn->rotation1 = fields[9].GetFloat();
+            thisSpawn->rotation2 = fields[10].GetFloat();
+            thisSpawn->rotation3 = fields[11].GetFloat();
+
+            // Add this spawn
+            m_spawnPoints[thisSpawn->pointId] = thisSpawn;
+            ++spawnPoints;
+        } while (result->NextRow());
+
+        TC_LOG_INFO("server.loading", "[Map %u] Loaded %u Spawn points", GetId(), spawnPoints);
+    }
+    else
+    {
+        TC_LOG_INFO("server.loading", "[Map %u] No spawn point data found", GetId());
+    }
 }
 
 void Map::LoadCorpseData()
