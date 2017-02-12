@@ -29,6 +29,7 @@
 #include "Log.h"
 #include "Map.h"
 #include "MiscPackets.h"
+#include "MapPoolMgr.h"
 #include "MovementInfo.h"
 #include "MovementPacketBuilder.h"
 #include "ObjectAccessor.h"
@@ -1045,13 +1046,16 @@ void WorldObject::SetVisibilityDistanceOverride(VisibilityDistanceType type)
     m_visibilityDistanceOverride = VisibilityDistances[AsUnderlyingType(type)];
 }
 
-void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/)
+void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/, bool unloadingGrid)
 {
     if (IsInWorld())
         RemoveFromWorld();
 
     if (Transport* transport = GetTransport())
         transport->RemovePassenger(this);
+
+    if (GetTypeId() == TYPEID_UNIT || GetTypeId() == TYPEID_GAMEOBJECT)
+        GetMap()->GetMapPoolMgr()->HandleDespawn(this, unloadingGrid);
 }
 
 void WorldObject::_Create(ObjectGuid::LowType guidlow, HighGuid guidhigh, uint32 phaseMask)
@@ -1850,6 +1854,7 @@ void WorldObject::AddObjectToRemoveList()
         return;
     }
 
+    map->GetMapPoolMgr()->HandleDespawn(this);
     map->AddObjectToRemoveList(this);
 }
 

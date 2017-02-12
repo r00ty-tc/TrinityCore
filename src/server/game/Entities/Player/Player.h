@@ -886,7 +886,7 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
 
         PlayerAI* AI() const { return reinterpret_cast<PlayerAI*>(GetAI()); }
 
-        void CleanupsBeforeDelete(bool finalCleanup = true) override;
+        void CleanupsBeforeDelete(bool finalCleanup = true, bool unloadingGrid = false) override;
 
         void AddToWorld() override;
         void RemoveFromWorld() override;

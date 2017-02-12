@@ -28,6 +28,7 @@
 #include "VMapFactory.h"
 #include "VMapManager2.h"
 #include "World.h"
+#include "MapPoolMgr.h"
 
 MapInstanced::MapInstanced(uint32 id, time_t expiry) : Map(id, expiry, 0, DUNGEON_DIFFICULTY_NORMAL)
 {
@@ -230,6 +231,8 @@ InstanceMap* MapInstanced::CreateInstance(uint32 InstanceId, InstanceSave* save,
 
     map->LoadRespawnTimes();
     map->LoadCorpseData();
+    // Must be done after respawn times loaded
+    map->GetMapPoolMgr()->SpawnMap();
 
     bool load_data = save != nullptr;
     map->CreateInstanceData(load_data);

@@ -51,10 +51,12 @@ class Object;
 class Player;
 class TempSummon;
 class Transport;
+class MapPoolMgr;
 class Unit;
 class Weather;
 class WorldObject;
 class WorldPacket;
+class MapPoolMgr;
 struct MapDifficulty;
 struct MapEntry;
 struct Position;
@@ -287,6 +289,35 @@ struct ZoneDynamicInfo
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
 #define MAP_INVALID_ZONE      0xFFFFFFFF
 
+struct MapPoolCreatureOverride;
+struct MapPoolGameObjectOverride;
+struct MapPoolItem;
+
+struct MapPoolSpawnPoint
+{
+    uint32 mapId;
+    uint32 pointId;
+    uint16 zoneId;
+    uint16 areaId;
+    uint32 gridId;
+    float positionX;
+    float positionY;
+    float positionZ;
+    float positionO;
+    float rotation0;
+    float rotation1;
+    float rotation2;
+    float rotation3;
+    MapPoolCreatureOverride* creatureOverride;
+    MapPoolGameObjectOverride* gameObjectOverride;
+    WorldObject* currentObject;
+    std::vector<WorldObject*> oldObjects;
+    MapPoolItem* currentItem;
+};
+typedef std::unordered_map<uint32, MapPoolSpawnPoint*> PoolSpawnPointMap;
+
+typedef std::map<uint32/*leaderDBGUID*/, CreatureGroup*>        CreatureGroupHolderType;
+
 struct RespawnInfo; // forward declaration
 struct CompareRespawnInfo
 {
@@ -296,11 +327,15 @@ using ZoneDynamicInfoMap = std::unordered_map<uint32 /*zoneId*/, ZoneDynamicInfo
 using RespawnListContainer = boost::heap::fibonacci_heap<RespawnInfo*, boost::heap::compare<CompareRespawnInfo>>;
 using RespawnListHandle = RespawnListContainer::handle_type;
 using RespawnInfoMap = std::unordered_map<ObjectGuid::LowType, RespawnInfo*>;
+using RespawnInfoMultimap = std::unordered_multimap<uint32, RespawnInfo*>;
+using RespawnVector = std::vector<RespawnInfo*>;
 struct RespawnInfo
 {
     SpawnObjectType type;
     ObjectGuid::LowType spawnId;
     uint32 entry;
+    uint32 poolId;
+    uint32 lastPoolPointId;
     time_t respawnTime;
     uint32 gridId;
     RespawnListHandle handle;
@@ -313,6 +348,10 @@ inline bool CompareRespawnInfo::operator()(RespawnInfo const* a, RespawnInfo con
         return (a->respawnTime > b->respawnTime);
     if (a->spawnId != b->spawnId)
         return a->spawnId < b->spawnId;
+    if (a->poolId != b->poolId)
+        return a->poolId < b->poolId;
+    if (a->lastPoolPointId != b->lastPoolPointId)
+        return a->lastPoolPointId < b->lastPoolPointId;
     ASSERT(a->type != b->type, "Duplicate respawn entry for spawnId (%u,%u) found!", a->type, a->spawnId);
     return a->type < b->type;
 }
@@ -320,6 +359,7 @@ inline bool CompareRespawnInfo::operator()(RespawnInfo const* a, RespawnInfo con
 class TC_GAME_API Map : public GridRefManager<NGridType>
 {
     friend class MapReference;
+    friend class MapPoolMgr;
     public:
         Map(uint32 id, time_t, uint32 InstanceId, uint8 SpawnMode, Map* _parent = nullptr);
         virtual ~Map();
@@ -542,6 +582,17 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
             return nullptr;
         }
 
+        std::vector<MapPoolSpawnPoint*> const* GetSpawnPointsInGrid(uint32 gridId) const
+        {
+            auto itr = _spawnPointsByGrid.find(gridId);
+            if (itr != _spawnPointsByGrid.end())
+                return &itr->second;
+
+            return nullptr;
+        }
+
+        void ProcessSpawnPointsForGrid(uint32 gridId) const;
+
         Corpse* GetCorpseByPlayer(ObjectGuid const& ownerGuid) const
         {
             auto itr = _corpsesByPlayer.find(ownerGuid);
@@ -593,7 +644,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         void UpdatePlayerZoneStats(uint32 oldZone, uint32 newZone);
 
-        void SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 gridId, CharacterDatabaseTransaction dbTrans = nullptr, bool startup = false);
+        void SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 gridId, CharacterDatabaseTransaction dbTrans = nullptr, bool startup = false, uint32 poolId = 0, uint32 lastSpawnPoint = 0);
         void SaveRespawnInfoDB(RespawnInfo const& info, CharacterDatabaseTransaction dbTrans = nullptr);
         void LoadRespawnTimes();
         void DeleteRespawnTimes() { UnloadAllRespawnInfos(); DeleteRespawnTimesInDB(GetId(), GetInstanceId()); }
@@ -649,6 +700,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         }
 
         virtual std::string GetDebugInfo() const;
+        MapPoolMgr* GetMapPoolMgr() const { return sMapPoolMgr; }
 
     private:
         void LoadMapAndVMap(int gx, int gy);
@@ -703,6 +755,9 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         void ScriptsProcess();
 
         void SendObjectUpdates();
+
+        MapPoolSpawnPoint* GetSpawnPoint(uint32 pointId);
+        void LoadSpawnPoints();
 
     protected:
         void SetUnloadReferenceLock(GridCoord const& p, bool on) { getNGrid(p.x_coord, p.y_coord)->setUnloadReferenceLock(on); }
@@ -764,6 +819,8 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         typedef std::multimap<time_t, ScriptAction> ScriptScheduleMap;
         ScriptScheduleMap m_scriptSchedule;
 
+        PoolSpawnPointMap m_spawnPoints;
+
     public:
         void ProcessRespawns();
         void ApplyDynamicModeRespawnScaling(WorldObject const* obj, ObjectGuid::LowType spawnId, uint32& respawnDelay, uint32 mode) const;
@@ -779,7 +836,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         RespawnInfo* GetRespawnInfo(SpawnObjectType type, ObjectGuid::LowType spawnId) const;
         void Respawn(RespawnInfo* info, CharacterDatabaseTransaction dbTrans = nullptr);
         void DeleteRespawnInfo(RespawnInfo* info, CharacterDatabaseTransaction dbTrans = nullptr);
-        void DeleteRespawnInfoFromDB(SpawnObjectType type, ObjectGuid::LowType spawnId, CharacterDatabaseTransaction dbTrans = nullptr);
+        void DeleteRespawnInfoFromDB(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 poolId = 0, CharacterDatabaseTransaction dbTrans = nullptr);
 
     public:
         void GetRespawnInfo(std::vector<RespawnInfo const*>& respawnData, SpawnObjectTypeMask types) const;
@@ -788,18 +845,25 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
             if (RespawnInfo* info = GetRespawnInfo(type, spawnId))
                 Respawn(info, dbTrans);
         }
+        std::vector<RespawnInfo*> GetPoolRespawnInfo(uint32 poolId);
+        bool GetPoolRespawnInfo(uint32 poolId, std::vector<RespawnInfo*>& ri);
+        RespawnInfo* GetFirstPoolRespawn(uint32 poolId);
+        void RemoveRespawnTime(std::vector<RespawnInfo*>& respawnData, CharacterDatabaseTransaction dbTrans = nullptr);
         void RemoveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, CharacterDatabaseTransaction dbTrans = nullptr, bool alwaysDeleteFromDB = false)
         {
             if (RespawnInfo* info = GetRespawnInfo(type, spawnId))
                 DeleteRespawnInfo(info, dbTrans);
             // Some callers might need to make sure the database doesn't contain any respawn time
             else if (alwaysDeleteFromDB)
-                DeleteRespawnInfoFromDB(type, spawnId, dbTrans);
+                DeleteRespawnInfoFromDB(type, spawnId, 0, dbTrans);
         }
         size_t DespawnAll(SpawnObjectType type, ObjectGuid::LowType spawnId);
 
         bool ShouldBeSpawnedOnGridLoad(SpawnObjectType type, ObjectGuid::LowType spawnId) const;
         template <typename T> bool ShouldBeSpawnedOnGridLoad(ObjectGuid::LowType spawnId) const { return ShouldBeSpawnedOnGridLoad(SpawnData::TypeFor<T>, spawnId); }
+
+        void RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, CharacterDatabaseTransaction dbTrans = nullptr) const;
+        void RemovePoolRespawns(std::vector<RespawnInfo*>& respawnData, uint32 poolId, CharacterDatabaseTransaction dbTrans = nullptr);
 
         SpawnGroupTemplateData const* GetSpawnGroupData(uint32 groupId) const;
 
@@ -851,6 +915,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         RespawnListContainer _respawnTimes;
         RespawnInfoMap       _creatureRespawnTimesBySpawnId;
         RespawnInfoMap       _gameObjectRespawnTimesBySpawnId;
+        RespawnInfoMultimap  _RespawnTimesByPoolId;
         RespawnInfoMap& GetRespawnMapForType(SpawnObjectType type)
         {
             switch (type)
@@ -900,12 +965,14 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         CreatureBySpawnIdContainer _creatureBySpawnIdStore;
         GameObjectBySpawnIdContainer _gameobjectBySpawnIdStore;
         std::unordered_map<uint32/*cellId*/, std::unordered_set<Corpse*>> _corpsesByCell;
+        std::unordered_map<uint32/*gridId*/, std::vector<MapPoolSpawnPoint*>> _spawnPointsByGrid;
         std::unordered_map<ObjectGuid, Corpse*> _corpsesByPlayer;
         std::unordered_set<Corpse*> _corpseBones;
 
         std::unordered_set<Object*> _updateObjects;
 
         MPSCQueue<FarSpellCallback> _farSpellCallbacks;
+        MapPoolMgr* sMapPoolMgr;
 };
 
 enum InstanceResetMethod

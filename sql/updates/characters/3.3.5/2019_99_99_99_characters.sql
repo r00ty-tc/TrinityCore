@@ -1,0 +1,5 @@
+ALTER TABLE `respawn`
+	ADD COLUMN `poolId` MEDIUMINT(8) UNSIGNED NOT NULL DEFAULT '0' AFTER `type`,
+	ADD COLUMN `pointId` INT(10) UNSIGNED NOT NULL DEFAULT '0' AFTER `respawnTime`,
+	DROP PRIMARY KEY,
+	ADD PRIMARY KEY (`type`, `poolId`, `spawnId`, `instanceId`);

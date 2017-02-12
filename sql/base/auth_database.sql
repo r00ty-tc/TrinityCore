@@ -989,6 +989,9 @@ INSERT INTO `rbac_linked_permissions` VALUES
 (197,863),
 (197,864),
 (197,865),
+(197,875),
+(197,876),
+(197,880),
 (198,218),
 (198,300),
 (198,312),
@@ -1787,6 +1790,13 @@ INSERT INTO `rbac_permissions` VALUES
 (879,'Command: debug poolstatus'),
 (880,'Command: pdump copy'),
 (881,'Command: reload vehicle_template');
+(884,'Command: pool'),
+(885,'Command: pool dump'),
+(886,'Command: pool respawn'),
+(887,'Command: pool despawn'),
+(888,'Command: pool reseed'),
+(889,'Command: pool list');
+
 /*!40000 ALTER TABLE `rbac_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 

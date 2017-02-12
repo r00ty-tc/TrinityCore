@@ -31,6 +31,7 @@
 #include "LootMgr.h"
 #include "Map.h"
 #include "MapManager.h"
+#include "MapPoolMgr.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "OutdoorPvPMgr.h"
@@ -140,12 +141,19 @@ GameObject::GameObject() : WorldObject(false), MapObject(),
 
     ResetLootMode(); // restore default loot mode
     m_stationaryPosition.Relocate(0.0f, 0.0f, 0.0f, 0.0f);
+    m_poolEntry = nullptr;
+    m_poolGameObject = nullptr;
+    m_poolPoint = nullptr;
 }
 
 GameObject::~GameObject()
 {
     delete m_AI;
     delete m_model;
+    ASSERT(!m_poolEntry, "GameObject destroyed with pool data attached");
+    ASSERT(!m_poolGameObject, "GameObject destroyed with pool GameObject data attached");
+    ASSERT(!m_poolPoint, "GameObject destroyed with pool spawnpoint data attached");
+
     //if (m_uint32Values)                                      // field array can be not exist if GameOBject not loaded
     //    CleanupsBeforeDelete();
 }
@@ -174,9 +182,9 @@ std::string const& GameObject::GetAIName() const
     return sObjectMgr->GetGameObjectTemplate(GetEntry())->AIName;
 }
 
-void GameObject::CleanupsBeforeDelete(bool finalCleanup)
+void GameObject::CleanupsBeforeDelete(bool finalCleanup, bool unloadingGrid)
 {
-    WorldObject::CleanupsBeforeDelete(finalCleanup);
+    WorldObject::CleanupsBeforeDelete(finalCleanup, unloadingGrid);
 
     if (m_uint32Values)                                      // field array can be not exist if GameOBject not loaded
         RemoveFromOwner();
@@ -920,6 +928,8 @@ void GameObject::Delete()
     if (GameObjectOverride const* goOverride = GetGameObjectOverride())
         SetUInt32Value(GAMEOBJECT_FLAGS, goOverride->Flags);
 
+    GetMap()->GetMapPoolMgr()->HandleDespawn(this);
+
     uint32 poolid = GetSpawnId() ? sPoolMgr->IsPartOfAPool<GameObject>(GetSpawnId()) : 0;
     if (poolid)
         sPoolMgr->UpdatePool<GameObject>(poolid, GetSpawnId());
@@ -1040,9 +1050,9 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     WorldDatabase.CommitTransaction(trans);
 }
 
-bool GameObject::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool)
+bool GameObject::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool, GameObjectData* goData)
 {
-    GameObjectData const* data = sObjectMgr->GetGameObjectData(spawnId);
+    GameObjectData const* data = goData ? goData : sObjectMgr->GetGameObjectData(spawnId);
 
     if (!data)
     {
@@ -1231,12 +1241,24 @@ void GameObject::SaveRespawnTime(uint32 forceDelay)
             ri.type = SPAWN_TYPE_GAMEOBJECT;
             ri.spawnId = m_spawnId;
             ri.respawnTime = m_respawnTime;
+            ri.poolId = 0;
+            ri.lastPoolPointId = 0;
             GetMap()->SaveRespawnInfoDB(ri);
             return;
         }
 
         uint32 thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
-        GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, m_spawnId, GetEntry(), thisRespawnTime, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId());
+        uint32 poolId = m_poolEntry ? m_poolEntry->GetRootPoolId() : 0;
+        uint32 pointId = m_poolPoint ? m_poolPoint->pointId : 0;
+        if (poolId != 0)
+        {
+            thisRespawnTime = forceDelay ? time(nullptr) + forceDelay : time(nullptr) + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
+            GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), 0, thisRespawnTime, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId(), nullptr, false, poolId, pointId);
+        }
+        else
+        {
+            GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, m_spawnId, GetEntry(), thisRespawnTime, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId());
+        }
     }
 }
 

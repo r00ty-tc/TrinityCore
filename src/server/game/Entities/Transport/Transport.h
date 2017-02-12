@@ -35,7 +35,7 @@ class TC_GAME_API Transport : public GameObject, public TransportBase
         ~Transport();
 
         bool Create(ObjectGuid::LowType guidlow, uint32 entry, uint32 mapid, float x, float y, float z, float ang, uint32 animprogress);
-        void CleanupsBeforeDelete(bool finalCleanup = true) override;
+        void CleanupsBeforeDelete(bool finalCleanup = true, bool unloadingGrid = false) override;
 
         void Update(uint32 diff) override;
         void DelayedUpdate(uint32 diff);

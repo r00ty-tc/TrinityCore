@@ -34,6 +34,8 @@
 #include "Log.h"
 #include "LootMgr.h"
 #include "MapManager.h"
+#include "Map.h"
+#include "MapPoolMgr.h"
 #include "MotionMaster.h"
 #include "MoveSpline.h"
 #include "ObjectAccessor.h"
@@ -269,6 +271,16 @@ Creature::Creature(bool isWorldObject): Unit(isWorldObject), MapObject(), m_grou
 
     ResetLootMode(); // restore default loot mode
     m_isTempWorldObject = false;
+    m_poolEntry = nullptr;
+    m_poolCreature = nullptr;
+    m_poolPoint = nullptr;
+}
+
+Creature::~Creature()
+{
+    ASSERT(!m_poolEntry, "Creature destroyed with pool data attached");
+    ASSERT(!m_poolCreature, "Creature destroyed with pool creature data attached");
+    ASSERT(!m_poolPoint, "Creature destroyed with pool spawnpoint data attached");
 }
 
 void Creature::AddToWorld()
@@ -1582,9 +1594,9 @@ bool Creature::CreateFromProto(ObjectGuid::LowType guidlow, uint32 entry, Creatu
     return true;
 }
 
-bool Creature::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate)
+bool Creature::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate, CreatureData* cData)
 {
-    if (!allowDuplicate)
+    if (!allowDuplicate && spawnId != 0)
     {
         // If an alive instance of this spawnId is already found, skip creation
         // If only dead instance(s) exist, despawn them and spawn a new (maybe also dead) version
@@ -1614,7 +1626,7 @@ bool Creature::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, 
         }
     }
 
-    CreatureData const* data = sObjectMgr->GetCreatureData(spawnId);
+    CreatureData const* data = cData ? cData : sObjectMgr->GetCreatureData(spawnId);
 
     if (!data)
     {
@@ -1999,6 +2011,8 @@ void Creature::setDeathState(DeathState s)
 
         if (needsFalling)
             GetMotionMaster()->MoveFall();
+
+        GetMap()->GetMapPoolMgr()->HandleDeath(this);
 
         Unit::setDeathState(CORPSE);
     }
@@ -2422,8 +2436,11 @@ bool Creature::_IsTargetAcceptable(Unit const* target) const
 
 void Creature::SaveRespawnTime(uint32 forceDelay)
 {
-    if (IsSummon() || !m_spawnId || (m_creatureData && !m_creatureData->dbData))
+    if (IsSummon() || (!m_spawnId && !m_poolEntry) || (m_creatureData && !m_creatureData->dbData))
         return;
+
+    uint32 poolId = m_poolEntry ? m_poolEntry->GetRootPoolId() : 0;
+    uint32 pointId = m_poolPoint ? m_poolPoint->pointId : 0;
 
     if (m_respawnCompatibilityMode)
     {
@@ -2435,8 +2452,18 @@ void Creature::SaveRespawnTime(uint32 forceDelay)
         return;
     }
 
-    time_t thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
-    GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId());
+    time_t thisRespawnTime = time_t(0);
+    if (poolId != 0)
+    {
+        // For pools, we use pool counter instead of spawnId
+        thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : GameTime::GetGameTime() + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
+        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), 0, thisRespawnTime, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), nullptr, false, poolId, pointId);
+    }
+    else
+    {
+        thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
+        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, 0, 0, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId());
+    }
 }
 
 // this should not be called by petAI or

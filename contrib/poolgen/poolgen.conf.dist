@@ -1,0 +1,4 @@
+dbServ => "127.0.0.1",
+dbName => "world",
+dbUser => "trinity",
+dbPass => "trinity",

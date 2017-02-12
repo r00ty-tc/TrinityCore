@@ -25,6 +25,7 @@
 #include "Language.h"
 #include "Log.h"
 #include "MapManager.h"
+#include "MapPoolMgr.h"
 #include "ObjectMgr.h"
 #include "PoolMgr.h"
 #include "Player.h"
@@ -944,6 +945,48 @@ void GameEventMgr::LoadFromDB()
             TC_LOG_INFO("server.loading", ">> Loaded %u pools for game events in %u ms.", count, GetMSTimeDiffToNow(oldMSTime));
         }
     }
+
+    TC_LOG_INFO("server.loading", "Loading Game Event Map Pool Data...");
+    {
+        uint32 oldMSTime = getMSTime();
+
+        //                                                               0                         1
+        QueryResult result = WorldDatabase.Query("SELECT gem.map, gem.eventEntry, gem.poolId FROM game_event_mappool gem"
+                                                 " INNER JOIN mappool_template mpt ON mpt.map = gem.map AND mpt.poolId = gem.poolId");
+
+        if (!result)
+            TC_LOG_INFO("server.loading", ">> Loaded 0 map pools for game events. DB table `game_event_mappool` is empty.");
+        else
+        {
+            uint32 count = 0;
+            do
+            {
+                Field* fields = result->Fetch();
+
+                uint32 map     = fields[0].GetUInt32();
+                int16 event_id = fields[1].GetInt8();
+                uint32 poolId  = fields[2].GetUInt32();
+
+                int32 internal_event_id = mGameEvent.size() + event_id - 1;
+
+                if (internal_event_id < 0 || internal_event_id >= int32(mGameEventMapPoolIds.size()))
+                {
+                    TC_LOG_ERROR("sql.sql", "`game_event_mappool`: game event id (%i) is out of range compared to max event id in `game_event`.", event_id);
+                    continue;
+                }
+
+                GameEventMapPool& poollist = mGameEventMapPoolIds[internal_event_id];
+                poollist.push_back(std::pair<uint32, uint32>(map, poolId));
+
+                ++count;
+            }
+            while (result->NextRow());
+
+            TC_LOG_INFO("server.loading", ">> Loaded %u maps pools for game events in %u ms.", count, GetMSTimeDiffToNow(oldMSTime));
+        }
+    }
+
+
 }
 
 void GameEventMgr::LoadHolidayDates()
@@ -1030,6 +1073,7 @@ void GameEventMgr::Initialize()
         mGameEventVendors.resize(maxEventId);
         mGameEventBattlegroundHolidays.resize(maxEventId, 0);
         mGameEventPoolIds.resize(maxEventId * 2 - 1);
+        mGameEventMapPoolIds.resize(maxEventId * 2 -1);
         mGameEventNPCFlags.resize(maxEventId);
         mGameEventModelEquip.resize(maxEventId);
     }
@@ -1322,8 +1366,26 @@ void GameEventMgr::GameEventSpawn(int16 event_id)
         return;
     }
 
+    if (internal_event_id >= int32(mGameEventMapPoolIds.size()))
+    {
+        TC_LOG_ERROR("gameevent", "GameEventMgr::GameEventSpawn attempted access to out of range mGameEventMapPoolIds element %u (size: %zu).",
+            internal_event_id, mGameEventPoolIds.size());
+        return;
+    }
+
     for (IdList::iterator itr = mGameEventPoolIds[internal_event_id].begin(); itr != mGameEventPoolIds[internal_event_id].end(); ++itr)
         sPoolMgr->SpawnPool(*itr);
+
+    Map* map = nullptr;
+    for (GameEventMapPool::iterator itr = mGameEventMapPoolIds[internal_event_id].begin(); itr != mGameEventMapPoolIds[internal_event_id].end(); ++itr)
+    {
+        // Only get map if it changed
+        if (!map || map->GetId() != itr->first)
+            map = sMapMgr->CreateBaseMap(itr->first);
+
+        if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            poolMgr->SetActive(itr->second, true);
+    }
 }
 
 void GameEventMgr::GameEventUnspawn(int16 event_id)
@@ -1400,6 +1462,17 @@ void GameEventMgr::GameEventUnspawn(int16 event_id)
     for (IdList::iterator itr = mGameEventPoolIds[internal_event_id].begin(); itr != mGameEventPoolIds[internal_event_id].end(); ++itr)
     {
         sPoolMgr->DespawnPool(*itr, true);
+    }
+
+    Map* map = nullptr;
+    for (GameEventMapPool::iterator itr = mGameEventMapPoolIds[internal_event_id].begin(); itr != mGameEventMapPoolIds[internal_event_id].end(); ++itr)
+    {
+        // Only get map if it changed
+        if (!map || map->GetId() != itr->first)
+            map = sMapMgr->CreateBaseMap(itr->first);
+
+        if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            poolMgr->SetActive(itr->second, false);
     }
 }
 
