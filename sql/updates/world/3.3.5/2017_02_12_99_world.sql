@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS `mappool_creature_template`;
 CREATE TABLE `mappool_creature_template`
 (
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -10,6 +11,7 @@ CREATE TABLE `mappool_creature_template`
   PRIMARY KEY (`map`, `poolId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Template';
 
+DROP TABLE IF EXISTS `mappool_gameobject_template`;
 CREATE TABLE `mappool_gameobject_template`
 (
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -22,6 +24,25 @@ CREATE TABLE `mappool_gameobject_template`
   PRIMARY KEY (`map`, `poolId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool GameObject Template';
 
+DROP TABLE IF EXISTS `mappool_creature_hierarchy`;
+CREATE TABLE `mappool_creature_hierarchy`
+(
+  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `poolId` mediumint(8) unsigned NOT NULL,
+  `childPoolId` mediumint(8) unsigned NOT NULL,
+  PRIMARY KEY (`map`, `poolId`, `childPoolId`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Hierarchy';
+
+DROP TABLE IF EXISTS `mappool_gameobject_hierarchy`;
+CREATE TABLE `mappool_gameobject_hierarchy`
+(
+  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `poolId` mediumint(8) unsigned NOT NULL,
+  `childPoolId` mediumint(8) unsigned NOT NULL,
+  PRIMARY KEY (`map`, `poolId`, `childPoolId`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool GameObject Hierarchy';
+
+DROP TABLE IF EXISTS `mappool_creature_spawns`;
 CREATE TABLE `mappool_creature_spawns`
 (
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -40,6 +61,7 @@ CREATE TABLE `mappool_creature_spawns`
   PRIMARY KEY (`map`, `poolId`, `pointId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Spawn Points';
 
+DROP TABLE IF EXISTS `mappool_gameobject_spawns`;
 CREATE TABLE `mappool_gameobject_spawns`
 (
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -62,7 +84,7 @@ CREATE TABLE `mappool_gameobject_spawns`
   PRIMARY KEY (`map`, `poolId`, `pointId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Gamobject Spawn Points';
 
-
+DROP TABLE IF EXISTS `mappool_creature_info`;
 CREATE TABLE `mappool_creature_info`
 (
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -88,6 +110,7 @@ CREATE TABLE `mappool_creature_info`
   PRIMARY KEY (`map`, `poolId`, `creatureId`, `creatureQualifier`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Data';
 
+DROP TABLE IF EXISTS `mappool_gameobject_info`;
 CREATE TABLE `mappool_gameobject_info`
 (
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',

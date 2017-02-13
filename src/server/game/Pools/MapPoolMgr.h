@@ -21,6 +21,22 @@
 #include "Define.h"
 #include "Map.h"
 
+// Forward declare all the things
+struct MapPoolCreatureTemplate;
+struct MapPoolGameObjectTemplate;
+struct MapPoolCreatureSpawn;
+struct MapPoolGameObjectSpawn;
+struct MapPoolCreatureInfo;
+struct MapPoolGameObjectInfo;
+struct MapPoolCreatureData;
+struct MapPoolGameObjectData;
+typedef std::vector<MapPoolCreatureSpawn*> MapPoolCreatureSpawnList;
+typedef std::vector<MapPoolGameObjectSpawn*> MapPoolGameObjectSpawnList;
+typedef std::vector<MapPoolCreatureInfo*> MapPoolCreatureInfoList;
+typedef std::vector<MapPoolGameObjectInfo*> MapPoolGameObjectInfoList;
+typedef std::unordered_map<uint32, MapPoolCreatureData*> MapPoolCreatureMap;
+typedef std::unordered_map<uint32, MapPoolGameObjectData*> MapPoolGameObjectMap;
+
 struct MapPoolCreatureTemplate
 {
     uint32 mapId;
@@ -60,8 +76,6 @@ struct MapPoolCreatureSpawn
     std::string ScriptNameOverride;
 };
 
-typedef std::vector<MapPoolCreatureSpawn*> MapPoolCreatureSpawnList;
-
 struct MapPoolGameObjectSpawn
 {
     uint32 mapId;
@@ -82,8 +96,6 @@ struct MapPoolGameObjectSpawn
     uint32 ScriptNameOverrideEntry;
     std::string ScriptNameOverride;
 };
-
-typedef std::vector<MapPoolGameObjectSpawn*> MapPoolGameObjectSpawnList;
 
 struct MapPoolCreatureInfo
 {
@@ -109,8 +121,6 @@ struct MapPoolCreatureInfo
     std::string ScriptNameOverride;
 };
 
-typedef std::vector<MapPoolCreatureInfo*> MapPoolCreatureInfoList;
-
 struct MapPoolGameObjectInfo
 {
     uint32 mapId;
@@ -124,13 +134,13 @@ struct MapPoolGameObjectInfo
     std::string ScriptNameOverride;
 };
 
-typedef std::vector<MapPoolGameObjectInfo*> MapPoolGameObjectInfoList;
-
 struct MapPoolCreatureData
 {
     MapPoolCreatureTemplate* poolTemplate;
     MapPoolCreatureSpawnList* spawnList;
     MapPoolCreatureInfoList* infoList;
+    MapPoolCreatureData* parentPool;
+    std::vector<MapPoolCreatureData*> childPools;
 };
 
 struct MapPoolGameObjectData
@@ -138,10 +148,9 @@ struct MapPoolGameObjectData
     MapPoolGameObjectTemplate* poolTemplate;
     MapPoolGameObjectSpawnList* spawnList;
     MapPoolGameObjectInfoList* infoList;
+    MapPoolGameObjectData* parentPool;
+    std::vector<MapPoolGameObjectData*> childPools;
 };
-
-typedef std::unordered_map<uint32, MapPoolCreatureData*> MapPoolCreatureMap;
-typedef std::unordered_map<uint32, MapPoolGameObjectData*> MapPoolGameObjectMap;
 
 class TC_GAME_API MapPoolMgr
 {
@@ -153,11 +162,17 @@ private:
     MapPoolGameObjectMap poolGameObjectMap;
     MapPoolCreatureData* createPoolCreatureData();
     MapPoolGameObjectData* createPoolGameObjectData();
+    MapPoolCreatureData* getCreaturePool(uint32 poolId);
+    MapPoolGameObjectData* getGameObjectPool(uint32 poolId);
+    bool checkHierarchy(MapPoolCreatureData const* childPool, MapPoolCreatureData const* thisPool);
+    bool checkHierarchy(MapPoolGameObjectData const* childPool, MapPoolGameObjectData const* thisPool);
 
 public:
     MapPoolMgr(Map* map);
     ~MapPoolMgr();
     void LoadMapPools();
+    MapPoolCreatureData const* GetCreaturePool(uint32 poolId);
+    MapPoolGameObjectData const* GetGameObjectPool(uint32 poolId);
 
 };
 
