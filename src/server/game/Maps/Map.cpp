@@ -4294,6 +4294,8 @@ void Map::SaveCreatureRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, tim
     RespawnInfo ri;
     ri.spawnId = spawnId;
     ri.entry = entry;
+    ri.poolId = 0;
+    ri.lastPoolSpawnId = 0;
     ri.respawnTime = respawnTime;
     ri.originalRespawnTime = respawnTime;
     ri.gridId = gridId;
@@ -4306,6 +4308,8 @@ void Map::SaveCreatureRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, tim
 
     SaveCreatureRespawnTimeDB(spawnId, ri.originalRespawnTime, respawntrans);
 }
+
+
 
 void Map::SaveCreatureRespawnTimeDB(ObjectGuid::LowType spawnId, time_t respawnTime, SQLTransaction respawntrans)
 {
@@ -4334,6 +4338,8 @@ void Map::SaveGORespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t re
     RespawnInfo ri;
     ri.spawnId = spawnId;
     ri.entry = entry;
+    ri.poolId = 0;
+    ri.lastPoolSpawnId = 0;
     ri.respawnTime = respawnTime;
     ri.originalRespawnTime = respawnTime;
     ri.gridId = gridId;

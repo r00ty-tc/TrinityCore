@@ -173,6 +173,9 @@ public:
     void LoadMapPools();
     MapPoolCreatureData const* GetCreaturePool(uint32 poolId);
     MapPoolGameObjectData const* GetGameObjectPool(uint32 poolId);
+    void LoadPoolRespawns(std::vector<RespawnInfo*>& respawnList);
+    void SaveCreaturePoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans);
+    void SaveGameobjectPoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans);
 
 };
 

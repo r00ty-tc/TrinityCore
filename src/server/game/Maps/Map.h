@@ -249,6 +249,8 @@ struct RespawnInfo
 {
     ObjectGuid::LowType spawnId;
     uint32 entry;
+    uint32 poolId;
+    uint32 lastPoolSpawnId;
     time_t respawnTime;
     time_t originalRespawnTime;
     uint32 gridId;
