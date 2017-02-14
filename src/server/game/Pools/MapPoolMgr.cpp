@@ -550,30 +550,6 @@ void MapPoolMgr::LoadPoolRespawns(std::vector<RespawnInfo*>& respawnList)
 
 void MapPoolMgr::SaveCreaturePoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans)
 {
-    if (!respawnTime)
-    {
-        // Delete only
-        ownerMap->RemoveCreatureRespawnTime(spawnId, 0, 0, false, respawntrans);
-        return;
-    }
-
-    time_t const timeNow = time(NULL);
-    RespawnInfo ri;
-    ri.spawnId = spawnId;
-    ri.entry = entry;
-    ri.poolId = 0;
-    ri.lastPoolSpawnId = 0;
-    ri.respawnTime = respawnTime;
-    ri.originalRespawnTime = respawnTime;
-    ri.gridId = gridId;
-    ri.cellAreaZoneId = cellAreaZoneId;
-    ri.spawnDelay = respawnTime > timeNow ? respawnTime - timeNow : 0;
-    ownerMap->AddCreatureRespawnInfo(ri, replace);
-
-    if (!WriteDB)
-        return;
-
-    SaveCreaturePoolRespawnTime(spawnId, ri.originalRespawnTime, respawntrans);
 }
 
 void MapPoolMgr::SaveGameobjectPoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans)

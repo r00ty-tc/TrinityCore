@@ -30,6 +30,7 @@ struct MapPoolCreatureInfo;
 struct MapPoolGameObjectInfo;
 struct MapPoolCreatureData;
 struct MapPoolGameObjectData;
+struct RespawnInfo;
 typedef std::vector<MapPoolCreatureSpawn*> MapPoolCreatureSpawnList;
 typedef std::vector<MapPoolGameObjectSpawn*> MapPoolGameObjectSpawnList;
 typedef std::vector<MapPoolCreatureInfo*> MapPoolCreatureInfoList;
