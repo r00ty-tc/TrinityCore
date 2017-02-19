@@ -32,7 +32,6 @@
 #include "GameObjectModel.h"
 #include "ObjectGuid.h"
 #include "Transaction.h"
-#include "MapPoolMgr.h"
 
 #include <bitset>
 #include <list>
@@ -56,6 +55,7 @@ class MapInstanced;
 class BattlegroundMap;
 class InstanceMap;
 class Transport;
+class MapPoolMgr;
 namespace Trinity { struct ObjectUpdater; }
 namespace VMAP { enum class ModelIgnoreFlags : uint32; }
 
@@ -288,7 +288,8 @@ typedef std::vector<RespawnInfo*> RespawnVector;
 class TC_GAME_API Map : public GridRefManager<NGridType>
 {
     friend class MapReference;
-    public:
+    friend class MapPoolMgr;
+public:
         Map(uint32 id, time_t, uint32 InstanceId, uint8 SpawnMode, Map* _parent = NULL);
         virtual ~Map();
 
@@ -621,7 +622,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
             _updateObjects.erase(obj);
         }
 
-        MapPoolMgr* GetMapPoolMgr() { return &sMapPoolMgr; }
+        MapPoolMgr* GetMapPoolMgr() { return sMapPoolMgr; }
 
     private:
 
@@ -843,7 +844,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         std::unordered_set<Corpse*> _corpseBones;
 
         std::unordered_set<Object*> _updateObjects;
-        MapPoolMgr sMapPoolMgr;
+        MapPoolMgr* sMapPoolMgr;
 };
 
 enum InstanceResetMethod

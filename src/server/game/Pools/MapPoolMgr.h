@@ -30,6 +30,8 @@ struct MapPoolCreatureInfo;
 struct MapPoolGameObjectInfo;
 struct MapPoolCreatureData;
 struct MapPoolGameObjectData;
+struct MapPoolAssignedCreature;
+struct MapPoolAssignedGameObject;
 struct RespawnInfo;
 typedef std::vector<MapPoolCreatureSpawn*> MapPoolCreatureSpawnList;
 typedef std::vector<MapPoolGameObjectSpawn*> MapPoolGameObjectSpawnList;
@@ -37,6 +39,10 @@ typedef std::vector<MapPoolCreatureInfo*> MapPoolCreatureInfoList;
 typedef std::vector<MapPoolGameObjectInfo*> MapPoolGameObjectInfoList;
 typedef std::unordered_map<uint32, MapPoolCreatureData*> MapPoolCreatureMap;
 typedef std::unordered_map<uint32, MapPoolGameObjectData*> MapPoolGameObjectMap;
+typedef std::unordered_map<Creature const*, MapPoolAssignedCreature*> MapPoolActiveCreatureMap;
+typedef std::unordered_map<GameObject const*, MapPoolAssignedGameObject*> MapPoolActiveGameObjectMap;
+typedef std::pair<uint32, uint32> RespawnPoolSpawnPointPair;
+typedef std::unordered_map<RespawnPoolSpawnPointPair, RespawnInfo*> respawnPoolInfoMap;
 
 struct MapPoolCreatureTemplate
 {
@@ -153,20 +159,93 @@ struct MapPoolGameObjectData
     std::vector<MapPoolGameObjectData*> childPools;
 };
 
+struct MapPoolAssignedCreature
+{
+    Creature* creature;
+    uint32 poolId;
+    MapPoolCreatureSpawn* spawnPoint;
+    MapPoolCreatureInfo* info;
+};
+
+struct MapPoolAssignedGameObject
+{
+    GameObject* gameObject;
+    uint32 poolId;
+    MapPoolGameObjectSpawn* spawnPoint;
+    MapPoolGameObjectInfo* info;
+};
+
 class TC_GAME_API MapPoolMgr
 {
+    friend class Map;
 
 private:
+    // Local respawn functions
+    respawnInfoMultiMap _creatureRespawnTimesByGridId;
+    respawnInfoMultiMap _creatureRespawnTimesByCellAreaZoneId;
+    respawnPoolInfoMap  _creatureRespawnTimesByPoolSpawnPoint;
+    respawnInfoMultiMap _gameObjectRespawnTimesByGridId;
+    respawnInfoMultiMap _gameObjectRespawnTimesByCellAreaZoneId;
+    respawnPoolInfoMap  _gameObjectRespawnTimesByPoolSpawnPoint;
+
+    std::unordered_map<uint32, uint32> _cellAreaZoneLastRespawnedCreatureMap;
+    std::unordered_map<uint32, uint32> _cellAreaZoneLastRespawnedGameObjectMap;
+
     Map* ownerMap;
     uint32 ownerMapId;
+    uint32 ownerInstanceId;
     MapPoolCreatureMap poolCreatureMap;
     MapPoolGameObjectMap poolGameObjectMap;
+    MapPoolActiveCreatureMap poolActiveCreatureMap;
+    MapPoolActiveGameObjectMap poolActiveGameObjectMap;
     MapPoolCreatureData* createPoolCreatureData();
     MapPoolGameObjectData* createPoolGameObjectData();
     MapPoolCreatureData* getCreaturePool(uint32 poolId);
     MapPoolGameObjectData* getGameObjectPool(uint32 poolId);
+    MapPoolCreatureSpawn* getCreatureSpawnPoint(uint32 poolId, uint32 spawnPoint);
+    MapPoolGameObjectSpawn* getGameObjectSpawnPoint(uint32 poolId, uint32 spawnPoint);
+    MapPoolCreatureInfo* getCreatureSpawnInfo(uint32 poolId, uint32 spawnPoint);
+    MapPoolGameObjectInfo* getGameObjectSpawnInfo(uint32 poolId, uint32 spawnPoint);
     bool checkHierarchy(MapPoolCreatureData const* childPool, MapPoolCreatureData const* thisPool);
     bool checkHierarchy(MapPoolGameObjectData const* childPool, MapPoolGameObjectData const* thisPool);
+
+    // Respawn functions
+    void RespawnCellAreaZoneCreature(uint32 cellZoneAreaId);
+    void RespawnCellAreaZoneGameObject(uint32 cellZoneAreaId);
+
+    void addRespawnInfo(respawnInfoMultiMap& gridList, respawnInfoMultiMap& cellAreaZoneList, respawnPoolInfoMap& spawnList, RespawnInfo& Info, bool replace = false);
+    bool getRespawnInfo(respawnInfoMultiMap const& gridList, respawnInfoMultiMap const& cellAreaZoneList, respawnPoolInfoMap const& spawnList, RespawnVector& RespawnData, uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true);
+    void deleteRespawnInfo(respawnInfoMultiMap& gridList, respawnInfoMultiMap& cellAreaZoneList, respawnPoolInfoMap& spawnList, uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true);
+
+    void RespawnCellAreaZone(uint32 cellId, uint32 zoneId, uint32 areaId);
+    void RespawnCreatureList(RespawnVector const& RespawnData, bool force = false);
+    void RespawnGameObjectList(RespawnVector const& RespawnData, bool force = false);
+
+    void AddCreatureRespawnInfo(RespawnInfo& Info, bool replace = false)
+    {
+        addRespawnInfo(_creatureRespawnTimesByGridId, _creatureRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, Info, replace);
+    }
+    bool GetCreatureRespawnInfo(RespawnVector& RespawnData, uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true)
+    {
+        return getRespawnInfo(_creatureRespawnTimesByGridId, _creatureRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, RespawnData, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
+    }
+    void DeleteCreatureRespawnInfo(uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true)
+    {
+        deleteRespawnInfo(_creatureRespawnTimesByGridId, _creatureRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
+    }
+
+    void AddGameObjectRespawnInfo(RespawnInfo& Info, bool replace = false)
+    {
+        addRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, Info, replace);
+    }
+    bool GetGameObjectRespawnInfo(RespawnVector& RespawnData, uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true)
+    {
+        return getRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, RespawnData, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
+    }
+    void DeleteGameObjectRespawnInfo(uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true)
+    {
+        deleteRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
+    }
 
 public:
     MapPoolMgr(Map* map);
@@ -174,10 +253,23 @@ public:
     void LoadMapPools();
     MapPoolCreatureData const* GetCreaturePool(uint32 poolId);
     MapPoolGameObjectData const* GetGameObjectPool(uint32 poolId);
-    void LoadPoolRespawns(std::vector<RespawnInfo*>& respawnList);
-    void SaveCreaturePoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans);
-    void SaveGameobjectPoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans);
+    void LoadPoolRespawns();
+    void SaveCreaturePoolRespawnTime(uint32 poolId, uint32 entry, uint32 spawnPointId, time_t respawnTime, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool WriteDB = true, bool replace = false, SQLTransaction respawntrans = nullptr);
+    void SaveCreaturePoolRespawnTimeDB(uint32 poolId, uint32 spawnPointId, time_t respawnTime, SQLTransaction respawntrans = nullptr);
+    void SaveGameObjectPoolRespawnTime(uint32 poolId, uint32 entry, uint32 spawnPointId, time_t respawnTime, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool WriteDB = true, bool replace = false, SQLTransaction respawntrans = nullptr);
+    void SaveGameObjectPoolRespawnTimeDB(uint32 poolId, uint32 spawnPointId, time_t respawnTime, SQLTransaction respawntrans = nullptr);
+    MapPoolAssignedCreature const* GetPoolForObject(Creature const* creature);
+    MapPoolAssignedGameObject const* GetPoolForObject(GameObject const* gameobject);
+    bool isPoolObject(Creature const* creature) { return (GetPoolForObject(creature) != nullptr); }
+    bool isPoolObject(GameObject const* gameobject) { return (GetPoolForObject(gameobject) != nullptr); }
 
+    // Respawn functions
+    bool GetRespawnData(RespawnVector& results, Map::RespawnObjectType type, bool onlyDue = false, uint32 poolId = 0, uint32 spawnPointId = 0, uint32 grid = 0, bool allMap = true, float x = 0.0f, float y = 0.0f, float z = 0.0f);
+    void DeleteRespawnTimes();
+
+    void RemoveCreatureRespawnTime(uint32 poolId = 0, uint32 spawnPointId = 0, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool respawnCreature = false, SQLTransaction respawntrans = nullptr);
+    void RemoveGORespawnTime(uint32 poolId = 0, uint32 spawnPointId = 0, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool respawnObject = false, SQLTransaction respawntrans = nullptr);
+    static void DeleteRespawnTimesInDB(uint16 mapId, uint32 instanceId);
 };
 
 #endif

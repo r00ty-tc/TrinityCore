@@ -18,6 +18,7 @@
 
 #include "Map.h"
 #include "MapManager.h"
+#include "MapPoolMgr.h"
 #include "Battleground.h"
 #include "MMapFactory.h"
 #include "CellImpl.h"
@@ -74,6 +75,7 @@ Map::~Map()
     if (!m_scriptSchedule.empty())
         sMapMgr->DecreaseScheduledScriptCount(m_scriptSchedule.size());
 
+    delete sMapPoolMgr;
     MMAP::MMapFactory::createOrGetMMapManager()->unloadMapInstance(GetId(), i_InstanceId);
 }
 
@@ -254,7 +256,7 @@ m_unloadTimer(0), m_VisibleDistance(DEFAULT_VISIBILITY_DISTANCE),
 m_VisibilityNotifyPeriod(DEFAULT_VISIBILITY_NOTIFY_PERIOD),
 m_activeNonPlayersIter(m_activeNonPlayers.end()), _transportsUpdateIter(_transports.end()),
 i_gridExpiry(expiry),
-i_scriptLock(false), _defaultLight(GetDefaultMapLight(id)), sMapPoolMgr(this)
+i_scriptLock(false), _defaultLight(GetDefaultMapLight(id))
 {
     m_parentMap = (_parent ? _parent : this);
     for (unsigned int idx=0; idx < MAX_NUMBER_OF_GRIDS; ++idx)
@@ -274,7 +276,8 @@ i_scriptLock(false), _defaultLight(GetDefaultMapLight(id)), sMapPoolMgr(this)
     Map::InitVisibilityDistance();
 
     sScriptMgr->OnCreateMap(this);
-    sMapPoolMgr.LoadMapPools();
+    sMapPoolMgr = new MapPoolMgr(this);
+    sMapPoolMgr->LoadMapPools();
 }
 
 void Map::InitVisibilityDistance()
@@ -4420,6 +4423,8 @@ void Map::LoadRespawnTimes()
 
         } while (result->NextRow());
     }
+
+    sMapPoolMgr->LoadPoolRespawns();
 }
 
 void Map::DeleteRespawnTimes()
@@ -4428,6 +4433,7 @@ void Map::DeleteRespawnTimes()
     DeleteGameObjectRespawnInfo(0, 0, 0, false);
 
     DeleteRespawnTimesInDB(GetId(), GetInstanceId());
+    sMapPoolMgr->DeleteRespawnTimes();
 }
 
 void Map::DeleteRespawnTimesInDB(uint16 mapId, uint32 instanceId)

@@ -326,16 +326,17 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     PrepareStatement(CHAR_DEL_GO_RESPAWN_BY_INSTANCE, "DELETE FROM gameobject_respawn WHERE mapId = ? AND instanceId = ?", CONNECTION_ASYNC);
 
     // Pool respawn (Creature)
-    PrepareStatement(CHAR_SEL_CREATURE_POOL_RESPAWNS, "SELECT poolId, spawnPointId, respawnTime FROM creature_pool_respawn WHERE mapId = ? AND instanceId = ?", CONNECTION_SYNCH);
-    PrepareStatement(CHAR_REP_CREATURE_POOL_RESPAWN, "REPLACE INTO creature_pool_respawn (poolId, spawnPointId, respawnTime, mapId, instanceId) VALUES (?, ?, ?, ?)", CONNECTION_ASYNC);
-    PrepareStatement(CHAR_DEL_CREATURE_POOL_RESPAWN, "DELETE FROM creature_pool_respawn WHERE poolId = ? AND spawnPointId = ? AND mapId = ? AND instanceId = ?", CONNECTION_ASYNC);
-    PrepareStatement(CHAR_DEL_CREATURE_POOL_RESPAWN_BY_INSTANCE, "DELETE FROM creature_pool_respawn WHERE mapId = ? AND instanceId = ?", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_SEL_CREATURE_POOL_RESPAWNS, "SELECT poolId, spawnPointId, respawnTime FROM creature_pool_respawn WHERE map = ? AND instanceId = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_REP_CREATURE_POOL_RESPAWN, "REPLACE INTO creature_pool_respawn (poolId, spawnPointId, respawnTime, map, instanceId) VALUES (?, ?, ?, ?, ?)", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_DEL_CREATURE_POOL_RESPAWN, "DELETE FROM creature_pool_respawn WHERE poolId = ? AND spawnPointId = ? AND map = ? AND instanceId = ?", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_DEL_CREATURE_POOL_RESPAWN_BY_INSTANCE, "DELETE FROM creature_pool_respawn WHERE map = ? AND instanceId = ?", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_SEL_MAX_CREATURE_POOL_RESPAWNS, "SELECT MAX(respawnTime), instanceId FROM creature_pool_respawn WHERE instanceId > 0 GROUP BY instanceId", CONNECTION_SYNCH);
 
     // Pool respawn (Gameobject)
-    PrepareStatement(CHAR_SEL_GO_POOL_RESPAWNS, "SELECT poolId, spawnPointId, respawnTime FROM gameobject_pool_respawn WHERE mapId = ? AND instanceId = ?", CONNECTION_SYNCH);
-    PrepareStatement(CHAR_REP_GO_POOL_RESPAWN, "REPLACE INTO gameobject_pool_respawn (poolId, spawnPointId, respawnTime, mapId, instanceId) VALUES (?, ?, ?, ?)", CONNECTION_ASYNC);
-    PrepareStatement(CHAR_DEL_GO_POOL_RESPAWN, "DELETE FROM gameobject_pool_respawn WHERE poolId = ? AND spawnPointId = ? AND mapId = ? AND instanceId = ?", CONNECTION_ASYNC);
-    PrepareStatement(CHAR_DEL_GO_POOL_RESPAWN_BY_INSTANCE, "DELETE FROM gameobject_pool_respawn WHERE mapId = ? AND instanceId = ?", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_SEL_GO_POOL_RESPAWNS, "SELECT poolId, spawnPointId, respawnTime FROM gameobject_pool_respawn WHERE map = ? AND instanceId = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_REP_GO_POOL_RESPAWN, "REPLACE INTO gameobject_pool_respawn (poolId, spawnPointId, respawnTime, map, instanceId) VALUES (?, ?, ?, ?, ?)", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_DEL_GO_POOL_RESPAWN, "DELETE FROM gameobject_pool_respawn WHERE poolId = ? AND spawnPointId = ? AND map = ? AND instanceId = ?", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_DEL_GO_POOL_RESPAWN_BY_INSTANCE, "DELETE FROM gameobject_pool_respawn WHERE map = ? AND instanceId = ?", CONNECTION_ASYNC);
 
     // GM Tickets
     PrepareStatement(CHAR_SEL_GM_TICKETS, "SELECT id, type, playerGuid, name, description, createTime, mapId, posX, posY, posZ, lastModifiedTime, closedBy, assignedTo, comment, response, completed, escalated, viewed, needMoreHelp FROM gm_ticket", CONNECTION_SYNCH);

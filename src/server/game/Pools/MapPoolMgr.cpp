@@ -18,10 +18,12 @@
 
 #include "MapPoolMgr.h"
 #include "ObjectMgr.h"
+#include "World.h"
 
 MapPoolMgr::MapPoolMgr(Map* map)
 {
     ownerMapId = map->GetId();
+    ownerInstanceId = map->GetInstanceId();
     ownerMap = map;
 }
 
@@ -523,6 +525,74 @@ MapPoolCreatureData* MapPoolMgr::getCreaturePool(uint32 poolId)
     return result;
 }
 
+MapPoolCreatureSpawn* MapPoolMgr::getCreatureSpawnPoint(uint32 poolId, uint32 spawnPoint)
+{
+    MapPoolCreatureSpawn* result = nullptr;
+    if (MapPoolCreatureData* poolData = getCreaturePool(poolId))
+    {
+        for (auto itr = *poolData->spawnList->begin(); itr != *poolData->spawnList->end(); ++itr)
+        {
+            if (itr->pointId == spawnPoint)
+            {
+                result = itr;
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+MapPoolCreatureInfo* MapPoolMgr::getCreatureSpawnInfo(uint32 poolId, uint32 spawnInfoId)
+{
+    MapPoolCreatureInfo* result = nullptr;
+    if (MapPoolCreatureData* poolData = getCreaturePool(poolId))
+    {
+        for (auto itr = *poolData->infoList->begin(); itr != *poolData->infoList->end(); ++itr)
+        {
+            if (itr->creatureId == spawnInfoId)
+            {
+                result = itr;
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+MapPoolGameObjectSpawn* MapPoolMgr::getGameObjectSpawnPoint(uint32 poolId, uint32 spawnPoint)
+{
+    MapPoolGameObjectSpawn* result = nullptr;
+    if (MapPoolGameObjectData* poolData = getGameObjectPool(poolId))
+    {
+        for (auto itr = *poolData->spawnList->begin(); itr != *poolData->spawnList->end(); ++itr)
+        {
+            if (itr->pointId == spawnPoint)
+            {
+                result = itr;
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+MapPoolGameObjectInfo* MapPoolMgr::getGameObjectSpawnInfo(uint32 poolId, uint32 spawnInfoId)
+{
+    MapPoolGameObjectInfo* result = nullptr;
+    if (MapPoolGameObjectData* poolData = getGameObjectPool(poolId))
+    {
+        for (auto itr = *poolData->infoList->begin(); itr != *poolData->infoList->end(); ++itr)
+        {
+            if (itr->gameobjectId == spawnInfoId)
+            {
+                result = itr;
+                break;
+            }
+        }
+    }
+    return result;
+}
+
 MapPoolGameObjectData* MapPoolMgr::getGameObjectPool(uint32 poolId)
 {
     MapPoolGameObjectData* result = nullptr;
@@ -543,16 +613,483 @@ MapPoolGameObjectData const* MapPoolMgr::GetGameObjectPool(uint32 poolId)
     return getGameObjectPool(poolId);
 }
 
-void MapPoolMgr::LoadPoolRespawns(std::vector<RespawnInfo*>& respawnList)
+void MapPoolMgr::LoadPoolRespawns()
 {
+    // Load creature respawns
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CREATURE_POOL_RESPAWNS);
+    stmt->setUInt16(0, ownerMapId);
+    stmt->setUInt32(1, ownerInstanceId);
+    if (PreparedQueryResult result = CharacterDatabase.Query(stmt))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 poolId = fields[0].GetUInt32();
+            uint32 spawnPointId = fields[1].GetUInt32();
+            uint32 respawnTime = fields[2].GetUInt32();
+
+            if (MapPoolCreatureSpawn* spawnPoint = getCreatureSpawnPoint(poolId, spawnPointId))
+                SaveCreaturePoolRespawnTime(poolId, 0, spawnPointId, time_t(respawnTime), ownerMap->GetZoneAreaGridId(Map::RespawnObjectType::OBJECT_TYPE_CREATURE, spawnPoint->positionX, spawnPoint->positionY, spawnPoint->positionZ), Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), false);
+
+        } while (result->NextRow());
+    }
+
+    // Load gameobject respawns
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_GO_POOL_RESPAWNS);
+    stmt->setUInt16(0, ownerMapId);
+    stmt->setUInt32(1, ownerInstanceId);
+    if (PreparedQueryResult result = CharacterDatabase.Query(stmt))
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 poolId = fields[0].GetUInt32();
+            uint32 spawnPointId = fields[1].GetUInt32();
+            uint32 respawnTime = fields[2].GetUInt32();
+
+            if (MapPoolGameObjectSpawn* spawnPoint = getGameObjectSpawnPoint(poolId, spawnPointId))
+                SaveCreaturePoolRespawnTime(poolId, 0, spawnPointId, time_t(respawnTime), ownerMap->GetZoneAreaGridId(Map::RespawnObjectType::OBJECT_TYPE_GAMEOBJECT, spawnPoint->positionX, spawnPoint->positionY, spawnPoint->positionZ), Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), false);
+
+        } while (result->NextRow());
+    }
 
 }
 
-void MapPoolMgr::SaveCreaturePoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans)
+void MapPoolMgr::RespawnCellAreaZoneCreature(uint32 cellZoneAreaId)
 {
+    // Check we've not visited this Cell/Area/Zone recently
+    auto timeItr = _cellAreaZoneLastRespawnedCreatureMap.find(cellZoneAreaId);
+    if (timeItr != _cellAreaZoneLastRespawnedCreatureMap.end() && GetMSTimeDiffToNow(timeItr->second) < sWorld->getIntConfig(CONFIG_RESPAWN_MINCELLCHECKMS))
+        return;
+
+    // Store this time, so we don't check so often
+    _cellAreaZoneLastRespawnedCreatureMap[cellZoneAreaId] = getMSTime();
+
+    RespawnVector rv;
+    switch (sWorld->getIntConfig(CONFIG_RESPAWN_ACTIVITYSCOPEGAMEOBJECT))
+    {
+        case RESPAWNSCOPE_CELL:
+            getRespawnInfo(_creatureRespawnTimesByGridId, _creatureRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, rv, 0, 0, cellZoneAreaId, false);
+            break;
+        case RESPAWNSCOPE_AREA:
+            getRespawnInfo(_creatureRespawnTimesByGridId, _creatureRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, rv, 0, 0, cellZoneAreaId, false);
+            break;
+        case RESPAWNSCOPE_ZONE:
+            getRespawnInfo(_creatureRespawnTimesByGridId, _creatureRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, rv, 0, 0, cellZoneAreaId, false);
+            break;
+    }
+
+    rv.clear();
+    if (GetCreatureRespawnInfo(rv, 0, 0, cellZoneAreaId))
+        RespawnCreatureList(rv);
 }
 
-void MapPoolMgr::SaveGameobjectPoolRespawnTime(ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans)
+void MapPoolMgr::RespawnCellAreaZoneGameObject(uint32 cellZoneAreaId)
 {
+    // Check we've not visited this Cell/Area/Zone recently
+    auto timeItr = _cellAreaZoneLastRespawnedGameObjectMap.find(cellZoneAreaId);
+    if (timeItr != _cellAreaZoneLastRespawnedGameObjectMap.end() && GetMSTimeDiffToNow(timeItr->second) < sWorld->getIntConfig(CONFIG_RESPAWN_MINCELLCHECKMS))
+        return;
 
+    // Store this time, so we don't check so often
+    _cellAreaZoneLastRespawnedGameObjectMap[cellZoneAreaId] = getMSTime();
+
+    RespawnVector rv;
+    switch (sWorld->getIntConfig(CONFIG_RESPAWN_ACTIVITYSCOPEGAMEOBJECT))
+    {
+        case RESPAWNSCOPE_CELL:
+            getRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, rv, 0, 0, cellZoneAreaId, false);
+            break;
+        case RESPAWNSCOPE_AREA:
+            getRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, rv, 0, 0, cellZoneAreaId, false);
+            break;
+        case RESPAWNSCOPE_ZONE:
+            getRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _creatureRespawnTimesByPoolSpawnPoint, rv, 0, 0, cellZoneAreaId, false);
+            break;
+    }
+
+    rv.clear();
+    if (GetGameObjectRespawnInfo(rv, 0, 0, cellZoneAreaId))
+        RespawnGameObjectList(rv);
+}
+
+void MapPoolMgr::addRespawnInfo(respawnInfoMultiMap& gridList, respawnInfoMultiMap& cellAreaZoneList, respawnPoolInfoMap& spawnList, RespawnInfo& Info, bool replace)
+{
+    if (!Info.poolId)
+        return;
+
+    // Uniqueness checked on the spawnList as master key
+    if (spawnList.find(RespawnPoolSpawnPointPair(Info.poolId, Info.lastPoolSpawnId)) == spawnList.end())
+    {
+        RespawnInfo* ri = new RespawnInfo();
+        *ri = Info;
+        spawnList[RespawnPoolSpawnPointPair(Info.poolId, Info.lastPoolSpawnId)] = ri;
+        gridList.emplace(Info.gridId, ri);
+        cellAreaZoneList.emplace(Info.cellAreaZoneId, ri);
+        return;
+    }
+    else if (!replace)
+    {
+        // If a spawn is found, and we're not blindly replacing
+        // Check if it is before our planned time. Only replace if not
+        RespawnInfo* ri = spawnList[RespawnPoolSpawnPointPair(Info.poolId, Info.lastPoolSpawnId)];
+        if (ri->originalRespawnTime > Info.originalRespawnTime)
+        {
+            deleteRespawnInfo(gridList, cellAreaZoneList, spawnList, Info.poolId, Info.lastPoolSpawnId, 0, 0, false);
+            addRespawnInfo(gridList, cellAreaZoneList, spawnList, Info, false);
+        }
+        else
+        {
+            // Otherwise update respawn entry to this earlier time
+            // This is really only so the DB is updated correctly
+            Info.originalRespawnTime = ri->originalRespawnTime;
+        }
+    }
+
+    if (replace)
+    {
+        // In case of replace, delete this spawn ID everywhere, then self call with no replace
+        deleteRespawnInfo(gridList, cellAreaZoneList, spawnList, Info.poolId, Info.lastPoolSpawnId, 0, 0, false);
+        addRespawnInfo(gridList, cellAreaZoneList, spawnList, Info, false);
+    }
+}
+
+bool MapPoolMgr::getRespawnInfo(respawnInfoMultiMap const& gridList, respawnInfoMultiMap const& cellAreaZoneList, respawnPoolInfoMap const& spawnList, RespawnVector& RespawnData, uint32 poolId, uint32 spawnPointId, uint32 gridId, uint32 cellAreaZoneId, bool onlyDue)
+{
+    // If no criteria passed, then return either due respawns, or all respawns
+    if (!poolId && !gridId && !cellAreaZoneId)
+    {
+        if (spawnList.begin() == spawnList.end())
+            return false;
+
+        for (respawnPoolInfoMap::const_iterator iter = spawnList.begin(); iter != spawnList.end();)
+        {
+            if (!onlyDue || time(NULL) >= iter->second->respawnTime)
+                RespawnData.push_back(iter->second);
+            ++iter;
+        }
+        return true;
+    }
+
+    if (poolId)
+    {
+        respawnPoolInfoMap::const_iterator iter = spawnList.find(RespawnPoolSpawnPointPair(poolId, spawnPointId));
+        if (iter == spawnList.end())
+            return false;
+
+        if (!onlyDue || time(NULL) >= iter->second->respawnTime)
+        {
+            RespawnData.push_back(iter->second);
+            return true;
+        }
+    }
+
+    if (cellAreaZoneId && gridId)
+        return false;
+
+    if (cellAreaZoneId || gridId)
+    {
+        auto const spawnBounds = cellAreaZoneId ? cellAreaZoneList.equal_range(cellAreaZoneId) : gridList.equal_range(gridId);
+        if (spawnBounds.first == spawnBounds.second)
+            return false;
+
+        for (respawnInfoMap::const_iterator iter = spawnBounds.first; iter != spawnBounds.second;)
+        {
+            if (!onlyDue || time(NULL) >= iter->second->respawnTime)
+            {
+                RespawnData.push_back(iter->second);
+            }
+            ++iter;
+        }
+        return true;
+    }
+
+    return false;
+}
+
+void MapPoolMgr::deleteRespawnInfo(respawnInfoMultiMap& gridList, respawnInfoMultiMap& cellAreaZoneList, respawnPoolInfoMap& spawnList, uint32 poolId, uint32 spawnPointId, uint32 gridId, uint32 cellAreaZoneId, bool onlyDue)
+{
+    // For delete, a bit more important to ensure only one present (or none to erase all)
+    if ((poolId && (gridId || cellAreaZoneId)) || (gridId && (poolId || cellAreaZoneId)) || (cellAreaZoneId && (poolId || gridId)))
+        ASSERT("too many active parameters passed to Map::deleteRespawnInfo");
+
+    RespawnVector rv;
+    if (getRespawnInfo(gridList, cellAreaZoneList, spawnList, rv, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue))
+    {
+        // Iterate through all elements to delete
+        for (RespawnInfo* ri : rv)
+        {
+            // First, find element in grid level and erase it
+            auto gridBound = gridList.equal_range(ri->gridId);
+            for (auto iter = gridBound.first; iter != gridBound.second;)
+            {
+                if (iter->second->poolId == ri->poolId && iter->second->lastPoolSpawnId == ri->lastPoolSpawnId)
+                    iter = gridList.erase(iter);
+                else
+                    ++iter;
+            }
+
+            // Next, find element in cell/area/zone level and erase it
+            auto cellAreaZoneBound = cellAreaZoneList.equal_range(ri->cellAreaZoneId);
+            for (auto iter = cellAreaZoneBound.first; iter != cellAreaZoneBound.second;)
+            {
+                if (iter->second->poolId == ri->poolId && iter->second->lastPoolSpawnId == ri->lastPoolSpawnId)
+                    iter = cellAreaZoneList.erase(iter);
+                else
+                    ++iter;
+            }
+
+            // Delete element in spawn level
+            spawnList.erase(RespawnPoolSpawnPointPair(ri->poolId, ri->lastPoolSpawnId));
+
+            // Finally delete the pointer storage itself
+            delete ri;
+        }
+    }
+}
+
+void MapPoolMgr::RespawnCellAreaZone(uint32 cellId, uint32 zoneId, uint32 areaId)
+{
+    switch (sWorld->getIntConfig(CONFIG_RESPAWN_ACTIVITYSCOPECREATURE))
+    {
+        case RESPAWNSCOPE_CELL:
+            RespawnCellAreaZoneCreature(cellId);
+            break;
+        case RESPAWNSCOPE_AREA:
+            RespawnCellAreaZoneCreature(areaId);
+            break;
+        case RESPAWNSCOPE_ZONE:
+            RespawnCellAreaZoneCreature(zoneId);
+            break;
+        default:
+            ASSERT("INVALID RESPAWN SCOPE");
+    }
+
+    switch (sWorld->getIntConfig(CONFIG_RESPAWN_ACTIVITYSCOPEGAMEOBJECT))
+    {
+        case RESPAWNSCOPE_CELL:
+            RespawnCellAreaZoneGameObject(cellId);
+            break;
+        case RESPAWNSCOPE_AREA:
+            RespawnCellAreaZoneGameObject(areaId);
+            break;
+        case RESPAWNSCOPE_ZONE:
+            RespawnCellAreaZoneGameObject(zoneId);
+            break;
+        default:
+            ASSERT("INVALID RESPAWN SCOPE");
+    }
+}
+
+void MapPoolMgr::RespawnCreatureList(RespawnVector const& RespawnData, bool force)
+{
+    // @Todo pool spawn methods
+}
+
+void MapPoolMgr::RespawnGameObjectList(RespawnVector const& RespawnData, bool force)
+{
+    // @Todo pool spawn methods
+}
+
+bool MapPoolMgr::GetRespawnData(RespawnVector& results, Map::RespawnObjectType type, bool onlyDue, uint32 poolId, uint32 spawnPointId, uint32 grid, bool allMap, float x, float y, float z)
+{
+    // Obtain references to appropriate respawn stores
+    respawnInfoMultiMap const& gridList = (type == Map::OBJECT_TYPE_CREATURE) ? _creatureRespawnTimesByGridId : _gameObjectRespawnTimesByGridId;
+    respawnInfoMultiMap const& scopeList = (type == Map::OBJECT_TYPE_CREATURE) ? _creatureRespawnTimesByCellAreaZoneId : _gameObjectRespawnTimesByCellAreaZoneId;
+    respawnPoolInfoMap const& spawnIdList = (type == Map::OBJECT_TYPE_CREATURE) ? _creatureRespawnTimesByPoolSpawnPoint : _gameObjectRespawnTimesByPoolSpawnPoint;
+
+    // Spawn ID supplied
+    if (poolId)
+    {
+        return getRespawnInfo(gridList, scopeList, spawnIdList, results, poolId, spawnPointId, 0, 0, onlyDue);
+    }
+
+    // All map, or grid only
+    if (grid || allMap)
+    {
+        return getRespawnInfo(gridList, scopeList, spawnIdList, results, 0, grid, 0, onlyDue);
+    }
+
+    // By scope
+    uint32 zoneAreaCellId = ownerMap->GetZoneAreaGridId(type, x, y, z);
+    return getRespawnInfo(gridList, scopeList, spawnIdList, results, 0, 0, zoneAreaCellId, onlyDue);
+}
+
+void MapPoolMgr::DeleteRespawnTimes()
+{
+    DeleteCreatureRespawnInfo(0, 0, 0, false);
+    DeleteGameObjectRespawnInfo(0, 0, 0, false);
+
+    DeleteRespawnTimesInDB(ownerMapId, ownerInstanceId);
+}
+
+void MapPoolMgr::DeleteRespawnTimesInDB(uint16 mapId, uint32 instanceId)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_POOL_RESPAWN_BY_INSTANCE);
+    stmt->setUInt16(0, mapId);
+    stmt->setUInt32(1, instanceId);
+    CharacterDatabase.Execute(stmt);
+
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_POOL_RESPAWN_BY_INSTANCE);
+    stmt->setUInt16(0, mapId);
+    stmt->setUInt32(1, instanceId);
+    CharacterDatabase.Execute(stmt);
+}
+
+void MapPoolMgr::RemoveCreatureRespawnTime(uint32 poolId, uint32 spawnPointId, uint32 cellAreaZoneId, uint32 gridId, bool respawnCreature, SQLTransaction respawntrans)
+{
+    if (!poolId && !cellAreaZoneId && !gridId)
+        return;
+
+    RespawnVector rv;
+    if (GetCreatureRespawnInfo(rv, poolId, spawnPointId, gridId, cellAreaZoneId, false))
+    {
+        SQLTransaction trans = respawntrans ? respawntrans : CharacterDatabase.BeginTransaction();
+
+        // Delete all creature respawns for this grid/cell/zone/area. Grid load will handle it the normal way
+        for (RespawnInfo* ri : rv)
+        {
+            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_POOL_RESPAWN);
+            stmt->setUInt32(0, ri->poolId);
+            stmt->setUInt32(1, ri->lastPoolSpawnId);
+            stmt->setUInt16(2, ownerMapId);
+            stmt->setUInt32(3, ownerInstanceId);
+            trans->Append(stmt);
+        }
+        if (!respawntrans)
+            CharacterDatabase.CommitTransaction(trans);
+
+        // Do respawns if needed
+        if (respawnCreature)
+            RespawnCreatureList(rv, true);
+        else
+            DeleteCreatureRespawnInfo(poolId, spawnPointId, gridId, cellAreaZoneId, false);
+    }
+}
+
+void MapPoolMgr::RemoveGORespawnTime(uint32 poolId, uint32 spawnPointId, uint32 cellAreaZoneId, uint32 gridId, bool respawnObject, SQLTransaction respawntrans)
+{
+    if (!poolId && !cellAreaZoneId && !gridId)
+        return;
+
+    RespawnVector rv;
+    if (GetGameObjectRespawnInfo(rv, poolId, spawnPointId, gridId, cellAreaZoneId, false))
+    {
+        SQLTransaction trans = respawntrans ? respawntrans : CharacterDatabase.BeginTransaction();
+
+        // Delete all gameobject respawns for this grid. Grid load will handle it the normal way
+        for (RespawnInfo* ri : rv)
+        {
+            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
+            stmt->setUInt32(0, ri->poolId);
+            stmt->setUInt32(1, ri->lastPoolSpawnId);
+            stmt->setUInt16(2, ownerMapId);
+            stmt->setUInt32(3, ownerInstanceId);
+            trans->Append(stmt);
+        }
+        if (!respawntrans)
+            CharacterDatabase.CommitTransaction(trans);
+
+        if (respawnObject)
+            RespawnGameObjectList(rv, true);
+        else
+            DeleteGameObjectRespawnInfo(poolId, spawnPointId, gridId, cellAreaZoneId, false);
+    }
+}
+
+void MapPoolMgr::SaveCreaturePoolRespawnTime(uint32 poolId, uint32 entry, uint32 spawnPointId, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans)
+{
+    if (!respawnTime)
+    {
+        // Delete only
+        RemoveCreatureRespawnTime(poolId, spawnPointId, 0, 0, false, respawntrans);
+        return;
+    }
+
+    time_t const timeNow = time(NULL);
+    RespawnInfo ri;
+    ri.spawnId = 0;
+    ri.entry = entry;
+    ri.poolId = poolId;
+    ri.lastPoolSpawnId = spawnPointId;
+    ri.respawnTime = respawnTime;
+    ri.originalRespawnTime = respawnTime;
+    ri.gridId = gridId;
+    ri.cellAreaZoneId = cellAreaZoneId;
+    ri.spawnDelay = respawnTime > timeNow ? respawnTime - timeNow : 0;
+    ownerMap->AddCreatureRespawnInfo(ri, replace);
+
+    if (!WriteDB)
+        return;
+
+    SaveCreaturePoolRespawnTimeDB(poolId, spawnPointId, ri.originalRespawnTime, respawntrans);
+}
+
+void MapPoolMgr::SaveCreaturePoolRespawnTimeDB(uint32 poolId, uint32 spawnPointId, time_t respawnTime, SQLTransaction respawntrans)
+{
+    // Just here for support of compatibility mode
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_CREATURE_POOL_RESPAWN);
+    stmt->setUInt32(0, poolId);
+    stmt->setUInt32(1, spawnPointId);
+    stmt->setUInt32(2, uint32(respawnTime));
+    stmt->setUInt16(3, ownerMapId);
+    stmt->setUInt32(4, ownerInstanceId);
+    if (respawntrans)
+        respawntrans->Append(stmt);
+    else
+        CharacterDatabase.Execute(stmt);
+}
+
+void MapPoolMgr::SaveGameObjectPoolRespawnTime(uint32 poolId, uint32 entry, uint32 spawnPointId, time_t respawnTime, uint32 cellAreaZoneId, uint32 gridId, bool WriteDB, bool replace, SQLTransaction respawntrans)
+{
+    if (!respawnTime)
+    {
+        // Delete only
+        RemoveGORespawnTime(poolId, spawnPointId, 0, 0, false, respawntrans);
+        return;
+    }
+
+    time_t const timeNow = time(NULL);
+    RespawnInfo ri;
+    ri.spawnId = 0;
+    ri.entry = entry;
+    ri.poolId = poolId;
+    ri.lastPoolSpawnId = spawnPointId;
+    ri.respawnTime = respawnTime;
+    ri.originalRespawnTime = respawnTime;
+    ri.gridId = gridId;
+    ri.cellAreaZoneId = cellAreaZoneId;
+    ri.spawnDelay = respawnTime > timeNow ? respawnTime - timeNow : 0;
+    AddGameObjectRespawnInfo(ri, replace);
+
+    if (!WriteDB)
+        return;
+
+    SaveGameObjectPoolRespawnTimeDB(poolId, spawnPointId, ri.originalRespawnTime, respawntrans);
+}
+
+void MapPoolMgr::SaveGameObjectPoolRespawnTimeDB(uint32 poolId, uint32 spawnPointId, time_t respawnTime, SQLTransaction respawntrans)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GO_POOL_RESPAWN);
+    stmt->setUInt32(0, poolId);
+    stmt->setUInt32(1, spawnPointId);
+    stmt->setUInt32(2, uint32(respawnTime));     // Note, use from ri, in case it was changed during add process
+    stmt->setUInt16(3, ownerMapId);
+    stmt->setUInt32(4, ownerInstanceId);
+    if (respawntrans)
+        respawntrans->Append(stmt);
+    else
+        CharacterDatabase.Execute(stmt);
+}
+
+MapPoolAssignedCreature const* MapPoolMgr::GetPoolForObject(Creature const* creature)
+{
+    auto itr = poolActiveCreatureMap.find(creature);
+    return itr == poolActiveCreatureMap.end() ? nullptr : itr->second;
+}
+
+MapPoolAssignedGameObject const* MapPoolMgr::GetPoolForObject(GameObject const* gameobject)
+{
+    auto itr = poolActiveGameObjectMap.find(gameobject);
+    return itr == poolActiveGameObjectMap.end() ? nullptr : itr->second;
 }
