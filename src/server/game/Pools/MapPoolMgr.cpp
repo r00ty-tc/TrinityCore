@@ -87,8 +87,10 @@ void MapPoolMgr::LoadMapPools()
     uint32 gameobjectPools = 0;
 
     // Read Creature Pool Templates
-    //        0       1          2          3         4         5
-    // SELECT poolId, phaseMask, spawnMask, minLimit, maxLimit, description FROM mappool_creature_template WHERE map = ?
+    //        0       1          2          3         4         5             6          7                 8                 9                   10
+    // SELECT poolId, phaseMask, spawnMask, minLimit, maxLimit, MovementType, spawnDist, spawntimeSecsMin, spawntimeSecsMax, corpsetimeSecsLoot, corpsetimeSecsNoLoot, 
+    //        11
+    //        description FROM mappool_creature_template WHERE map = ?
     PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_CREATURE_TEMPLATE);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -120,7 +122,13 @@ void MapPoolMgr::LoadMapPools()
             thisTemplate->spawnMask = fields[2].GetUInt8();
             thisTemplate->minLimit = fields[3].GetUInt32();
             thisTemplate->maxLimit = fields[4].GetUInt32();
-            thisTemplate->description = fields[5].GetString();
+            thisTemplate->movementType = fields[5].GetUInt8();
+            thisTemplate->spawnDist = fields[6].GetFloat();
+            thisTemplate->spawntimeSecsMin = fields[7].GetUInt32();
+            thisTemplate->spawntimeSecsMax = fields[8].GetInt32();
+            thisTemplate->corpsetimeSecsLoot = fields[9].GetUInt32();
+            thisTemplate->corpsetimeSecsNoLoot = fields[10].GetUInt32();
+            thisTemplate->description = fields[11].GetString();
             thisPool->parentPool = nullptr;
             thisPool->childPools.clear();
             ++creaturePools;
@@ -144,10 +152,6 @@ void MapPoolMgr::LoadMapPools()
             {
                 if (MapPoolCreatureData* childPool = getCreaturePool(childPoolId))
                 {
-                    // Get the templates
-                    MapPoolCreatureTemplate* thisTemplate = thisPool->poolTemplate;
-                    MapPoolCreatureTemplate* childTemplate = childPool->poolTemplate;
-
                     // Add references, both ways
                     if (childPool->parentPool == nullptr)
                     {
@@ -180,8 +184,12 @@ void MapPoolMgr::LoadMapPools()
     }
 
     // Read Creature Pool Spawnpoints
-    //        0       1        2       3       4          5          6          7            8                    9               10                       11
-    // SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride FROM mappool_creature_spawns WHERE map = ?
+    //        0       1        2       3       4          5          6          7            8       9                     10                 11
+    // SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, gridId, MovementTypeOverride, spawnDistOverride, spawntimeSecsMinOverride, 
+    //        12                        13                          14                            15                   16              17
+    //        spawntimeSecsMaxOverride, corpsetimeSecsLootOverride, corpsetimeSecsNoLootOverride, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, 
+    //        18
+    //        ScriptNameOverride FROM mappool_creature_spawns WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_CREATURE_SPAWNS);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -207,10 +215,17 @@ void MapPoolMgr::LoadMapPools()
                 thisSpawn->positionY = fields[5].GetFloat();
                 thisSpawn->positionZ = fields[6].GetFloat();
                 thisSpawn->positionO = fields[7].GetFloat();
-                thisSpawn->AINameOverrideEntry = fields[8].GetUInt32();
-                thisSpawn->AINameOverride = fields[9].GetString();
-                thisSpawn->ScriptNameOverrideEntry = fields[10].GetUInt32();
-                thisSpawn->ScriptNameOverride = fields[11].GetString();
+                thisSpawn->gridId = fields[8].GetUInt32();
+                thisSpawn->movementTypeOverride = fields[9].GetUInt8();
+                thisSpawn->spawnDistOverride = fields[10].GetFloat();
+                thisSpawn->spawntimeSecsMinOverride = fields[11].GetUInt32();
+                thisSpawn->spawntimeSecsMaxOverride = fields[12].GetUInt32();
+                thisSpawn->corpsetimeSecsLootOverride = fields[13].GetUInt32();
+                thisSpawn->corpsetimeSecsNoLootOverride = fields[14].GetUInt32();
+                thisSpawn->AINameOverrideEntry = fields[15].GetUInt32();
+                thisSpawn->AINameOverride = fields[16].GetString();
+                thisSpawn->ScriptNameOverrideEntry = fields[17].GetUInt32();
+                thisSpawn->ScriptNameOverride = fields[18].GetString();
 
                 // Add this spawn
                 thisSpawnList->push_back(thisSpawn);
@@ -224,10 +239,12 @@ void MapPoolMgr::LoadMapPools()
     }
 
     // Read Creature Pool Info
-    //        0       1           2                  3       4        5            6              7                   8                     9          10
-    // SELECT poolId, creatureId, creatureQualifier, chance, modelId, equipmentId, spawntimeSecs, corpsetimeSecsLoot, corpsetimeSecsNoLoot, spawnDist, currentWaypoint,
-    // 11         12       13            14       15         16            17              18
-    // curHealth, curMana, MovementType, npcFlag, unitFlags, dynamicFlags, AINameOverride, ScriptNameOverride FROM mappool_creature_info WHERE map = ?
+    //        0       1           2                  3       4        5            6                7          8        9        10         11
+    // SELECT poolId, creatureId, creatureQualifier, chance, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags, 
+    //        12                    13                 14                        15                        16                          17
+    //        MovementTypeOverride, spawnDistOverride, spawntimeSecsMinOverride, spawntimeSecsMaxOverride, corpsetimeSecsLootOverride, corpsetimeSecsNoLootOverride, 
+    //        18              19
+    //        AINameOverride, ScriptNameOverride FROM mappool_creature_info WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_CREATURE_INFO);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -251,19 +268,20 @@ void MapPoolMgr::LoadMapPools()
                 thisInfo->chance = fields[3].GetFloat();
                 thisInfo->modelId = fields[4].GetUInt32();
                 thisInfo->equipmentId = fields[5].GetUInt8();
-                thisInfo->spawntimeSecs = fields[6].GetInt32();
-                thisInfo->corpsetimeSecsLoot = fields[7].GetUInt32();
-                thisInfo->corpsetimeSecsNoLoot = fields[8].GetUInt32();
-                thisInfo->spawnDist = fields[9].GetFloat();
-                thisInfo->currentWaypoint = fields[10].GetUInt32();
-                thisInfo->curHealth = fields[11].GetUInt32();
-                thisInfo->curMana = fields[12].GetUInt32();
-                thisInfo->movementType = fields[13].GetUInt8();
-                thisInfo->npcFlag = fields[14].GetUInt32();
-                thisInfo->unitFlags = fields[15].GetUInt32();
-                thisInfo->dynamicFlags = fields[16].GetUInt32();
-                thisInfo->AINameOverride = fields[17].GetString();
-                thisInfo->ScriptNameOverride = fields[18].GetString();
+                thisInfo->currentWaypoint = fields[6].GetUInt32();
+                thisInfo->curHealth = fields[7].GetUInt32();
+                thisInfo->curMana = fields[8].GetUInt32();
+                thisInfo->npcFlag = fields[9].GetUInt32();
+                thisInfo->unitFlags = fields[10].GetUInt32();
+                thisInfo->dynamicFlags = fields[11].GetUInt32();
+                thisInfo->movementTypeOverride = fields[12].GetUInt8();
+                thisInfo->spawnDistOverride = fields[13].GetFloat();
+                thisInfo->spawntimeSecsMinOverride = fields[14].GetInt32();
+                thisInfo->spawntimeSecsMaxOverride = fields[15].GetInt32();
+                thisInfo->corpsetimeSecsLootOverride = fields[16].GetUInt32();
+                thisInfo->corpsetimeSecsNoLootOverride = fields[17].GetUInt32();
+                thisInfo->AINameOverride = fields[18].GetString();
+                thisInfo->ScriptNameOverride = fields[19].GetString();
 
                 // Add this info
                 thisInfoList->push_back(thisInfo);
@@ -276,8 +294,8 @@ void MapPoolMgr::LoadMapPools()
     }
 
     // Read GameObject Pool Templates
-    //        0       1          2          3         4         5
-    // SELECT poolId, phaseMask, spawnMask, minLimit, maxLimit, description FROM mappool_gameobject_template WHERE map = ?
+    //        0       1          2          3         4         5                 6                 7
+    // SELECT poolId, phaseMask, spawnMask, minLimit, maxLimit, spawntimeSecsMin, spawntimeSecsMax, description FROM mappool_gameobject_template WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_TEMPLATE);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -308,7 +326,9 @@ void MapPoolMgr::LoadMapPools()
             thisTemplate->spawnMask = fields[2].GetUInt8();
             thisTemplate->minLimit = fields[3].GetUInt32();
             thisTemplate->maxLimit = fields[4].GetUInt32();
-            thisTemplate->description = fields[5].GetString();
+            thisTemplate->spawntimeSecsMin = fields[5].GetUInt32();
+            thisTemplate->spawntimeSecsMax = fields[6].GetInt32();
+            thisTemplate->description = fields[7].GetString();
             thisPool->parentPool = nullptr;
             thisPool->childPools.clear();
             ++gameobjectPools;
@@ -369,9 +389,10 @@ void MapPoolMgr::LoadMapPools()
 
     // Read GameObject Pool Spawnpoints
     //        0       1        2       3       4          5          6          7            8          9          10         11         12
-    // SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, rotation0, rotation1, rotation2, rotation3, AINameOverrideEntry,
-    // 13              14                       15
-    // AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride FROM mappool_gameobject_spawns WHERE map = ?
+    // SELECT poolId, pointId, zoneId, areaId, positionX, positionY, positionZ, orientation, rotation0, rotation1, rotation2, rotation3, gridId, 
+    //        13                        14                        15                   16              17                       18
+    //        spawntimeSecsMinOverride, spawntimeSecsMaxOverride, AINameOverrideEntry, AINameOverride, ScriptNameOverrideEntry, ScriptNameOverride 
+    // FROM mappool_gameobject_spawns WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_SPAWNS);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -401,10 +422,13 @@ void MapPoolMgr::LoadMapPools()
                 thisSpawn->rotation1 = fields[9].GetFloat();
                 thisSpawn->rotation2 = fields[10].GetFloat();
                 thisSpawn->rotation3 = fields[11].GetFloat();
-                thisSpawn->AINameOverrideEntry = fields[12].GetUInt32();
-                thisSpawn->AINameOverride = fields[13].GetString();
-                thisSpawn->ScriptNameOverrideEntry = fields[14].GetUInt32();
-                thisSpawn->ScriptNameOverride = fields[15].GetString();
+                thisSpawn->gridId = fields[12].GetUInt32();
+                thisSpawn->spawntimeSecsMinOverride = fields[13].GetUInt32();
+                thisSpawn->spawntimeSecsMaxOverride = fields[14].GetUInt32();
+                thisSpawn->AINameOverrideEntry = fields[15].GetUInt32();
+                thisSpawn->AINameOverride = fields[16].GetString();
+                thisSpawn->ScriptNameOverrideEntry = fields[17].GetUInt32();
+                thisSpawn->ScriptNameOverride = fields[18].GetString();
 
                 // Add this spawn
                 thisSpawnList->push_back(thisSpawn);
@@ -418,8 +442,10 @@ void MapPoolMgr::LoadMapPools()
     }
 
     // Read GameObject Pool Info
-    //        0       1             2                    3       4             5      6               7
-    // SELECT poolId, gameobjectId, gameobjectQualifier, chance, animProgress, state, AINameOverride, ScriptNameOverride FROM mappool_gameobject_info WHERE map = ?
+    //        0       1             2                    3       4                         5                         6             7      8
+    // SELECT poolId, gameobjectId, gameobjectQualifier, chance, spawntimeSecsMinOverride, spawntimeSecsMaxOverride, animProgress, state, AINameOverride, 
+    //        9
+    //        ScriptNameOverride FROM mappool_gameobject_info WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_INFO);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -441,10 +467,12 @@ void MapPoolMgr::LoadMapPools()
                 thisInfo->gameobjectId = fields[1].GetUInt32();
                 thisInfo->gameobjectQualifier = fields[2].GetUInt32();
                 thisInfo->chance = fields[3].GetFloat();
-                thisInfo->animProgress = fields[4].GetUInt8();
-                thisInfo->state = fields[5].GetUInt8();
-                thisInfo->AINameOverride = fields[6].GetString();
-                thisInfo->ScriptNameOverride = fields[7].GetString();
+                thisInfo->spawntimeSecsMinOverride = fields[4].GetUInt32();
+                thisInfo->spawntimeSecsMaxOverride = fields[5].GetUInt32();
+                thisInfo->animProgress = fields[6].GetUInt8();
+                thisInfo->state = fields[7].GetUInt8();
+                thisInfo->AINameOverride = fields[8].GetString();
+                thisInfo->ScriptNameOverride = fields[9].GetString();
 
                 // Add this info
                 thisInfoList->push_back(thisInfo);

@@ -35,6 +35,7 @@
 #include "Log.h"
 #include "LootMgr.h"
 #include "MoveSpline.h"
+#include "MapPoolMgr.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "PoolMgr.h"
@@ -2332,7 +2333,10 @@ void Creature::SaveRespawnTime(uint32 forceDelay, bool savetodb)
     }
 
     uint32 thisRespawnTime = forceDelay ? time(NULL) + forceDelay : m_respawnTime;
-    GetMap()->SaveCreatureRespawnTime(m_spawnId, GetEntry(), thisRespawnTime, GetMap()->GetZoneAreaGridId(Map::OBJECT_TYPE_CREATURE, GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY(), GetHomePosition().GetPositionZ()), Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), m_creatureData->dbData ? savetodb : false);
+    if (MapPoolAssignedCreature const* poolObject = GetMap()->GetMapPoolMgr()->GetPoolForObject(this))
+        GetMap()->GetMapPoolMgr()->SaveCreaturePoolRespawnTime(poolObject->poolId, GetEntry(), poolObject->spawnPoint->pointId, thisRespawnTime, GetMap()->GetZoneAreaGridId(Map::OBJECT_TYPE_CREATURE, GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY(), GetHomePosition().GetPositionZ()), Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), m_creatureData->dbData ? savetodb : false);
+    else
+        GetMap()->SaveCreatureRespawnTime(m_spawnId, GetEntry(), thisRespawnTime, GetMap()->GetZoneAreaGridId(Map::OBJECT_TYPE_CREATURE, GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY(), GetHomePosition().GetPositionZ()), Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), m_creatureData->dbData ? savetodb : false);
 }
 
 // this should not be called by petAI or

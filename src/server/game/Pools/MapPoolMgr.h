@@ -52,6 +52,12 @@ struct MapPoolCreatureTemplate
     uint8 spawnMask;
     uint32 minLimit;
     uint32 maxLimit;
+    uint8 movementType;
+    float spawnDist;
+    uint32 spawntimeSecsMin;
+    uint32 spawntimeSecsMax;
+    uint32 corpsetimeSecsLoot;
+    uint32 corpsetimeSecsNoLoot;
     std::string description;
 };
 
@@ -63,6 +69,8 @@ struct MapPoolGameObjectTemplate
     uint8 spawnMask;
     uint32 minLimit;
     uint32 maxLimit;
+    uint32 spawntimeSecsMin;
+    uint32 spawntimeSecsMax;
     std::string description;
 };
 
@@ -77,6 +85,13 @@ struct MapPoolCreatureSpawn
     float positionY;
     float positionZ;
     float positionO;
+    uint32 gridId;
+    uint8 movementTypeOverride;
+    float spawnDistOverride;
+    uint32 spawntimeSecsMinOverride;
+    uint32 spawntimeSecsMaxOverride;
+    uint32 corpsetimeSecsLootOverride;
+    uint32 corpsetimeSecsNoLootOverride;
     uint32 AINameOverrideEntry;
     std::string AINameOverride;
     uint32 ScriptNameOverrideEntry;
@@ -98,6 +113,9 @@ struct MapPoolGameObjectSpawn
     float rotation1;
     float rotation2;
     float rotation3;
+    uint32 gridId;
+    uint32 spawntimeSecsMinOverride;
+    uint32 spawntimeSecsMaxOverride;
     uint32 AINameOverrideEntry;
     std::string AINameOverride;
     uint32 ScriptNameOverrideEntry;
@@ -113,17 +131,18 @@ struct MapPoolCreatureInfo
     float chance;
     uint32 modelId;
     int8 equipmentId;
-    uint32 spawntimeSecs;
-    uint32 corpsetimeSecsLoot;
-    uint32 corpsetimeSecsNoLoot;
-    float spawnDist;
     uint32 currentWaypoint;
     uint32 curHealth;
     uint32 curMana;
-    uint8 movementType;
     uint32 npcFlag;
     uint32 unitFlags;
     uint32 dynamicFlags;
+    uint8 movementTypeOverride;
+    float spawnDistOverride;
+    uint32 spawntimeSecsMinOverride;
+    uint32 spawntimeSecsMaxOverride;
+    uint32 corpsetimeSecsLootOverride;
+    uint32 corpsetimeSecsNoLootOverride;
     std::string AINameOverride;
     std::string ScriptNameOverride;
 };
@@ -135,6 +154,8 @@ struct MapPoolGameObjectInfo
     uint32 gameobjectId;
     uint32 gameobjectQualifier;
     float chance;
+    uint32 spawntimeSecsMinOverride;
+    uint32 spawntimeSecsMaxOverride;
     uint8 animProgress;
     uint8 state;
     std::string AINameOverride;
@@ -190,6 +211,12 @@ private:
 
     std::unordered_map<uint32, uint32> _cellAreaZoneLastRespawnedCreatureMap;
     std::unordered_map<uint32, uint32> _cellAreaZoneLastRespawnedGameObjectMap;
+
+    // Pool active/inactive spawn lists
+    std::vector<MapPoolCreatureSpawn*> _inactiveCreatureSpawnList;
+    std::unordered_map<MapPoolCreatureSpawn*, Creature*> _activeCreatureSpawnList;
+    std::vector<MapPoolGameObjectSpawn*> _inactiveGameObjectSpawnList;
+    std::unordered_map<MapPoolGameObjectSpawn*, GameObject*> _activeGameObjectSpawnList;
 
     Map* ownerMap;
     uint32 ownerMapId;

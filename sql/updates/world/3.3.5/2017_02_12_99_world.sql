@@ -1,33 +1,41 @@
 DROP TABLE IF EXISTS `mappool_creature_template`;
 CREATE TABLE `mappool_creature_template`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `phaseMask` int(10) unsigned NOT NULL DEFAULT '1',
   `spawnMask` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `minLimit` int(10) unsigned NOT NULL DEFAULT '1',
   `maxLimit` int(10) unsigned NOT NULL DEFAULT '1',
-  `description` varchar(255) NULL,
+  `MovementType` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `spawnDist` float NOT NULL DEFAULT '0',
+  `spawntimeSecsMin` int(10) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMax` int(10) unsigned NOT NULL DEFAULT '0',
+  `corpsetimeSecsLoot` int(10) unsigned NOT NULL DEFAULT '0',
+  `corpsetimeSecsNoLoot` int(10) unsigned NOT NULL DEFAULT '0',
+  `description` varchar(255) NULL DEFAULT '',
   PRIMARY KEY (`map`, `poolId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Template';
 
 DROP TABLE IF EXISTS `mappool_gameobject_template`;
 CREATE TABLE `mappool_gameobject_template`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `phaseMask` int(10) unsigned NOT NULL DEFAULT '1',
   `spawnMask` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `minLimit` int(10) unsigned NOT NULL DEFAULT '1',
   `maxLimit` int(10) unsigned NOT NULL DEFAULT '1',
-  `description` varchar(255) NULL,
+  `spawntimeSecsMin` int(10) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMax` int(10) unsigned NOT NULL DEFAULT '0',
+  `description` varchar(255) NULL DEFAULT '',
   PRIMARY KEY (`map`, `poolId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool GameObject Template';
 
 DROP TABLE IF EXISTS `mappool_creature_hierarchy`;
 CREATE TABLE `mappool_creature_hierarchy`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `childPoolId` mediumint(8) unsigned NOT NULL,
   PRIMARY KEY (`map`, `poolId`, `childPoolId`)
@@ -36,7 +44,7 @@ CREATE TABLE `mappool_creature_hierarchy`
 DROP TABLE IF EXISTS `mappool_gameobject_hierarchy`;
 CREATE TABLE `mappool_gameobject_hierarchy`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `childPoolId` mediumint(8) unsigned NOT NULL,
   PRIMARY KEY (`map`, `poolId`, `childPoolId`)
@@ -45,7 +53,7 @@ CREATE TABLE `mappool_gameobject_hierarchy`
 DROP TABLE IF EXISTS `mappool_creature_spawns`;
 CREATE TABLE `mappool_creature_spawns`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `pointId` mediumint(8) unsigned NOT NULL,
   `zoneId` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -54,9 +62,16 @@ CREATE TABLE `mappool_creature_spawns`
   `positionY` float NOT NULL DEFAULT '0',
   `positionZ` float NOT NULL DEFAULT '0',
   `orientation` float NOT NULL DEFAULT '0',
-  `AINameOverrideEntry` mediumint(8) unsigned NOT NULL,
+  `gridId` mediumint(8) unsigned NOT NULL DEFAULT '0',
+  `MovementTypeOverride` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `spawnDistOverride` float NOT NULL DEFAULT '0',
+  `spawntimeSecsMinOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMaxOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `corpsetimeSecsLootOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `corpsetimeSecsNoLootOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `AINameOverrideEntry` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `AINameOverride` varchar(64) NOT NULL DEFAULT '',
-  `ScriptNameOverrideEntry` mediumint(8) unsigned NOT NULL,
+  `ScriptNameOverrideEntry` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `ScriptNameOverride` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`map`, `poolId`, `pointId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Spawn Points';
@@ -64,7 +79,7 @@ CREATE TABLE `mappool_creature_spawns`
 DROP TABLE IF EXISTS `mappool_gameobject_spawns`;
 CREATE TABLE `mappool_gameobject_spawns`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `pointId` mediumint(8) unsigned NOT NULL,
   `zoneId` smallint(5) unsigned NOT NULL DEFAULT '0',
@@ -77,9 +92,12 @@ CREATE TABLE `mappool_gameobject_spawns`
   `rotation1` float NOT NULL DEFAULT '0',
   `rotation2` float NOT NULL DEFAULT '0',
   `rotation3` float NOT NULL DEFAULT '0',
-  `AINameOverrideEntry` mediumint(8) unsigned NOT NULL,
+  `gridId` mediumint(8) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMinOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMaxOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `AINameOverrideEntry` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `AINameOverride` varchar(64) NOT NULL DEFAULT '',
-  `ScriptNameOverrideEntry` mediumint(8) unsigned NOT NULL,
+  `ScriptNameOverrideEntry` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `ScriptNameOverride` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`map`, `poolId`, `pointId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Gamobject Spawn Points';
@@ -87,24 +105,25 @@ CREATE TABLE `mappool_gameobject_spawns`
 DROP TABLE IF EXISTS `mappool_creature_info`;
 CREATE TABLE `mappool_creature_info`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `creatureId` mediumint(8) unsigned NOT NULL,
   `creatureQualifier` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `chance` float NOT NULL DEFAULT '0',
   `modelId` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `equipmentId` tinyint(3) NOT NULL DEFAULT '0',
-  `spawntimeSecs` int(10) unsigned NOT NULL DEFAULT '0',
-  `corpsetimeSecsLoot` int(10) unsigned NOT NULL DEFAULT '0',
-  `corpsetimeSecsNoLoot` int(10) unsigned NOT NULL DEFAULT '0',
-  `spawnDist` float NOT NULL DEFAULT '0',
   `currentWaypoint` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `curHealth` int(10) unsigned NOT NULL DEFAULT '1',
   `curMana` int(10) unsigned NOT NULL DEFAULT '0',
-  `MovementType` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `npcFlag` int(10) unsigned NOT NULL DEFAULT '0',
   `unitFlags` int(10) unsigned NOT NULL DEFAULT '0',
   `dynamicFlags` int(10) unsigned NOT NULL DEFAULT '0',
+  `MovementTypeOverride` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `spawnDistOverride` float NOT NULL DEFAULT '0',
+  `spawntimeSecsMinOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMaxOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `corpsetimeSecsLootOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `corpsetimeSecsNoLootOverride` int(10) unsigned NOT NULL DEFAULT '0',
   `AINameOverride` varchar(64) NOT NULL DEFAULT '',
   `ScriptNameOverride` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`map`, `poolId`, `creatureId`, `creatureQualifier`)
@@ -113,11 +132,13 @@ CREATE TABLE `mappool_creature_info`
 DROP TABLE IF EXISTS `mappool_gameobject_info`;
 CREATE TABLE `mappool_gameobject_info`
 (
-  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `map` smallint(5) unsigned NOT NULL,
   `poolId` mediumint(8) unsigned NOT NULL,
   `gameobjectId` mediumint(8) unsigned NOT NULL,
   `gameobjectQualifier` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `chance` float NOT NULL DEFAULT '0',
+  `spawntimeSecsMinOverride` int(10) unsigned NOT NULL DEFAULT '0',
+  `spawntimeSecsMaxOverride` int(10) unsigned NOT NULL DEFAULT '0',
   `animProgress` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `state` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `AINameOverride` varchar(64) NOT NULL DEFAULT '',
