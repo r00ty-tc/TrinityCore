@@ -194,6 +194,8 @@ void MapPoolMgr::LoadMapPools()
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
     {
+        std::vector<MapPoolCreatureSpawn*> gridUpdateList;
+
         do
         {
             Field* fields = result->Fetch();
@@ -229,6 +231,10 @@ void MapPoolMgr::LoadMapPools()
 
                 // Add this spawn
                 thisSpawnList->push_back(thisSpawn);
+
+                // Add to empty grid list if grid id 0
+                if (thisSpawn->gridId == 0)
+                    gridUpdateList.push_back(thisSpawn);
             }
             else
             {
@@ -236,6 +242,25 @@ void MapPoolMgr::LoadMapPools()
             }
 
         } while (result->NextRow());
+
+        // Update empty grid ids
+        for (auto const spawn : gridUpdateList)
+        {
+            if (Trinity::IsValidMapCoord(spawn->positionX, spawn->positionY))
+            {
+                GridCoord thisGrid = Trinity::ComputeGridCoord(spawn->positionX, spawn->positionY);
+                spawn->gridId = thisGrid.GetId();
+
+                PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_MAPPOOL_CREATURE_ZONE_GRID_DATA);
+
+                stmt->setUInt32(0, spawn->gridId);
+                stmt->setUInt32(1, spawn->mapId);
+                stmt->setUInt32(2, spawn->poolId);
+                stmt->setUInt64(3, spawn->pointId);
+
+                WorldDatabase.Execute(stmt);
+            }
+        }
     }
 
     // Read Creature Pool Info
@@ -397,6 +422,7 @@ void MapPoolMgr::LoadMapPools()
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
     {
+        std::vector<MapPoolGameObjectSpawn*> gridUpdateList;
         do
         {
             Field* fields = result->Fetch();
@@ -432,13 +458,35 @@ void MapPoolMgr::LoadMapPools()
 
                 // Add this spawn
                 thisSpawnList->push_back(thisSpawn);
+
+                // Add to empty grid list if grid id 0
+                if (thisSpawn->gridId == 0)
+                    gridUpdateList.push_back(thisSpawn);
             }
             else
             {
                 TC_LOG_ERROR("server.loading", "[Map %u] Attempted to add gameobject spawn to non existent pool %u", ownerMapId, poolId);
             }
-
         } while (result->NextRow());
+
+        // Update empty grid ids
+        for (auto const spawn : gridUpdateList)
+        {
+            if (Trinity::IsValidMapCoord(spawn->positionX, spawn->positionY))
+            {
+                GridCoord thisGrid = Trinity::ComputeGridCoord(spawn->positionX, spawn->positionY);
+                spawn->gridId = thisGrid.GetId();
+
+                PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_MAPPOOL_GAMEOBJECT_ZONE_GRID_DATA);
+
+                stmt->setUInt32(0, spawn->gridId);
+                stmt->setUInt32(1, spawn->mapId);
+                stmt->setUInt32(2, spawn->poolId);
+                stmt->setUInt64(3, spawn->pointId);
+
+                WorldDatabase.Execute(stmt);
+            }
+        }
     }
 
     // Read GameObject Pool Info
