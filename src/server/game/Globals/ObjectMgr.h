@@ -1084,6 +1084,14 @@ class TC_GAME_API ObjectMgr
         bool isGOGroupActive(uint32 groupId) { return (((_gameObjectGroupDataStore.find(groupId) != _gameObjectGroupDataStore.end()) & _gameObjectGroupDataStore[groupId].isActive)); }
         void setCreatureGroupActive(uint32 groupId, bool isActive) { _creatureGroupDataStore[groupId].isActive = isActive; }
         void setGOGroupActive(uint32 groupId, bool isActive) { _gameObjectGroupDataStore[groupId].isActive = isActive; }
+        CreatureGroupTemplateData* GetCreatureGroupTemplate(uint32 groupId)
+        {
+            return ((_creatureGroupDataStore.find(groupId) != _creatureGroupDataStore.end()) ? &_creatureGroupDataStore[groupId] : nullptr);
+        }
+        GameObjectGroupTemplateData* GetGameObjectGroupTemplate(uint32 groupId)
+        {
+            return ((_gameObjectGroupDataStore.find(groupId) != _gameObjectGroupDataStore.end()) ? &_gameObjectGroupDataStore[groupId] : nullptr);
+        }
 
         typedef std::multimap<int32, uint32> ExclusiveQuestGroups;
         typedef std::pair<ExclusiveQuestGroups::const_iterator, ExclusiveQuestGroups::const_iterator> ExclusiveQuestGroupsBounds;

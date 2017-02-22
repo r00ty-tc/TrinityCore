@@ -21,6 +21,12 @@
 #include "Define.h"
 #include "Map.h"
 
+enum PoolDynamicGroups
+{
+    POOL_CREATURE_GROUP = 5,
+    POOL_GAMEOBJECT_GROUP = 5
+};
+
 // Forward declare all the things
 struct MapPoolCreatureTemplate;
 struct MapPoolGameObjectTemplate;
@@ -43,6 +49,9 @@ typedef std::unordered_map<Creature const*, MapPoolAssignedCreature*> MapPoolAct
 typedef std::unordered_map<GameObject const*, MapPoolAssignedGameObject*> MapPoolActiveGameObjectMap;
 typedef std::pair<uint32, uint32> RespawnPoolSpawnPointPair;
 typedef std::unordered_map<RespawnPoolSpawnPointPair, RespawnInfo*> respawnPoolInfoMap;
+
+// Other forward declarations
+struct CreatureData;
 
 struct MapPoolCreatureTemplate
 {
@@ -265,14 +274,19 @@ private:
     {
         addRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, Info, replace);
     }
+
     bool GetGameObjectRespawnInfo(RespawnVector& RespawnData, uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true)
     {
         return getRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, RespawnData, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
     }
+
     void DeleteGameObjectRespawnInfo(uint32 poolId, uint32 spawnPointId, uint32 gridId = 0, uint32 cellAreaZoneId = 0, bool onlyDue = true)
     {
         deleteRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
     }
+
+    void buildCreatureData(CreatureData& cdata, MapPoolCreatureTemplate const* pool, MapPoolCreatureInfo const* info, MapPoolCreatureSpawn const* spawn);
+    void buildGameObjectData(GameObjectData& cdata, MapPoolGameObjectTemplate const* pool, MapPoolGameObjectInfo const* info, MapPoolGameObjectSpawn const* spawn);
 
 public:
     MapPoolMgr(Map* map);

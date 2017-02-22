@@ -29,7 +29,9 @@ MapPoolMgr::MapPoolMgr(Map* map)
 
 MapPoolMgr::~MapPoolMgr()
 {
-    //uint32 creaturePools = 0;
+    DeleteCreatureRespawnInfo(0, 0, 0, 0, false);
+    DeleteGameObjectRespawnInfo(0, 0, 0, 0, false);
+
     // First clear all references
     for (std::pair<uint32, MapPoolCreatureData*> mapResult : poolCreatureMap)
     {
@@ -54,11 +56,9 @@ MapPoolMgr::~MapPoolMgr()
         delete mapResult.second->poolTemplate;
         mapResult.second->childPools.clear();
         delete mapResult.second;
-        //++creaturePools;
     }
     poolCreatureMap.clear();
 
-    //uint32 gameobjectPools = 0;
     // Destroy GO Pool Data
     for (std::pair<uint32, MapPoolGameObjectData*> mapResult : poolGameObjectMap)
     {
@@ -72,11 +72,8 @@ MapPoolMgr::~MapPoolMgr()
         delete mapResult.second->poolTemplate;
         mapResult.second->childPools.clear();
         delete mapResult.second;
-        //++gameobjectPools;
     }
     poolGameObjectMap.clear();
-
-    //TC_LOG_INFO("server.loading", "Destroyed %u creature pools and %u gameobject pools for map %u", creaturePools, gameobjectPools, ownerMapId);
 }
 
 void MapPoolMgr::LoadMapPools()
@@ -1168,4 +1165,68 @@ MapPoolAssignedGameObject const* MapPoolMgr::GetPoolForObject(GameObject const* 
 {
     auto itr = poolActiveGameObjectMap.find(gameobject);
     return itr == poolActiveGameObjectMap.end() ? nullptr : itr->second;
+}
+
+void MapPoolMgr::buildCreatureData(CreatureData& cdata, MapPoolCreatureTemplate const* pool, MapPoolCreatureInfo const* info, MapPoolCreatureSpawn const* spawn)
+{
+    // Calculate spawn time, we'll need it soon
+    uint32 spawnTimeMin = (info->spawntimeSecsMinOverride ? info->spawntimeSecsMinOverride : (spawn->spawntimeSecsMinOverride ? spawn->spawntimeSecsMinOverride : pool->spawntimeSecsMin));
+    uint32 spawnTimeMax = (info->spawntimeSecsMaxOverride ? info->spawntimeSecsMaxOverride : (spawn->spawntimeSecsMaxOverride ? spawn->spawntimeSecsMaxOverride : pool->spawntimeSecsMax));
+
+    // Assumes valid pointers on input
+    cdata.curhealth = info->curHealth;
+    cdata.curmana = info->curMana;
+    cdata.currentwaypoint = info->currentWaypoint;
+    cdata.dbData = false;
+    cdata.displayid = info->modelId;
+    cdata.dynamicflags = info->dynamicFlags;
+    cdata.equipmentId = info->equipmentId;
+    cdata.groupdata = sObjectMgr->GetCreatureGroupTemplate(POOL_CREATURE_GROUP);
+    cdata.id = 0;
+    cdata.mapid = pool->mapId;
+
+    // Take from info preferred, then spawn point and if still not overridden take from pool template
+    cdata.movementType = (info->movementTypeOverride ? info->movementTypeOverride : (spawn->movementTypeOverride ? spawn->movementTypeOverride : pool->movementType));
+    cdata.spawndist = (info->spawnDistOverride ? info->spawnDistOverride : (spawn->spawnDistOverride ? spawn->spawnDistOverride : pool->spawnDist));
+    cdata.spawntimesecs = (spawnTimeMin == spawnTimeMax) ? spawnTimeMin : (spawnTimeMin + (rand() * (spawnTimeMax - spawnTimeMin)));
+
+    cdata.npcflag = info->npcFlag;
+    cdata.phaseMask = pool->phaseMask;
+    cdata.spawnMask = pool->spawnMask;
+    cdata.unit_flags = info->unitFlags;
+
+    cdata.posX = spawn->positionX;
+    cdata.posY = spawn->positionX;
+    cdata.posZ = spawn->positionX;
+    cdata.orientation = spawn->positionO;
+}
+
+void MapPoolMgr::buildGameObjectData(GameObjectData& godata, MapPoolGameObjectTemplate const* pool, MapPoolGameObjectInfo const* info, MapPoolGameObjectSpawn const* spawn)
+{
+    // Calculate spawn time, we'll need it soon
+    uint32 spawnTimeMin = (info->spawntimeSecsMinOverride ? info->spawntimeSecsMinOverride : (spawn->spawntimeSecsMinOverride ? spawn->spawntimeSecsMinOverride : pool->spawntimeSecsMin));
+    uint32 spawnTimeMax = (info->spawntimeSecsMaxOverride ? info->spawntimeSecsMaxOverride : (spawn->spawntimeSecsMaxOverride ? spawn->spawntimeSecsMaxOverride : pool->spawntimeSecsMax));
+
+    // Assumes valid pointers on input
+    godata.dbData = false;
+    godata.groupdata = sObjectMgr->GetGameObjectGroupTemplate(POOL_GAMEOBJECT_GROUP);
+    godata.id = 0;
+    godata.mapid = pool->mapId;
+    godata.animprogress = info->animProgress;
+    godata.artKit = 0;
+    godata.go_state = (GOState)info->state;
+
+    godata.posX = spawn->positionX;
+    godata.posY = spawn->positionX;
+    godata.posZ = spawn->positionX;
+    godata.orientation = spawn->positionO;
+    godata.rotation.x = spawn->rotation0;
+    godata.rotation.y = spawn->rotation0;
+    godata.rotation.z = spawn->rotation0;
+    godata.rotation.w = spawn->rotation0;
+
+    godata.spawntimesecs = (spawnTimeMin == spawnTimeMax) ? spawnTimeMin : (spawnTimeMin + (rand() * (spawnTimeMax - spawnTimeMin)));
+
+    godata.phaseMask = pool->phaseMask;
+    godata.spawnMask = pool->spawnMask;
 }

@@ -145,3 +145,10 @@ CREATE TABLE `mappool_gameobject_info`
   `ScriptNameOverride` varchar(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`map`, `poolId`, `gameobjectId`, `gameobjectQualifier`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool GameObject Data';
+
+DELETE FROM `creature_group_template` WHERE `groupId` = 5;
+INSERT INTO `creature_group_template` (`groupId`, `groupName`, `groupFlags`) VALUES
+(5, 'Pool Creature Group', 2),
+
+INSERT INTO `gameobject_group_template` (`groupId`, `groupName`, `groupFlags`) VALUES
+(5, 'Pool GameObject Group', 2),
