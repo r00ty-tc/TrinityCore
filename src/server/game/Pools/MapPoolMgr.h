@@ -52,6 +52,10 @@ typedef std::unordered_map<RespawnPoolSpawnPointPair, RespawnInfo*> respawnPoolI
 
 // Other forward declarations
 struct CreatureData;
+struct GameObjectData;
+
+typedef std::pair<MapPoolCreatureSpawn*, CreatureData*> PendingCreature;
+typedef std::pair<MapPoolGameObjectSpawn*, GameObjectData*> PendingGameObject;
 
 struct MapPoolCreatureTemplate
 {
@@ -178,6 +182,11 @@ struct MapPoolCreatureData
     MapPoolCreatureInfoList* infoList;
     MapPoolCreatureData* parentPool;
     std::vector<MapPoolCreatureData*> childPools;
+
+    // Pool active/inactive spawn lists
+    std::vector<MapPoolCreatureSpawn*> _inactiveSpawnList;
+    std::vector<PendingCreature> _pendingSpawnList;
+    std::unordered_map<MapPoolCreatureSpawn*, Creature*> _activeSpawnList;
 };
 
 struct MapPoolGameObjectData
@@ -187,12 +196,17 @@ struct MapPoolGameObjectData
     MapPoolGameObjectInfoList* infoList;
     MapPoolGameObjectData* parentPool;
     std::vector<MapPoolGameObjectData*> childPools;
+
+    // Pool active/inactive spawn lists
+    std::vector<MapPoolGameObjectSpawn*> _inactiveSpawnList;
+    std::vector<PendingGameObject> _pendingSpawnList;
+    std::unordered_map<MapPoolGameObjectSpawn*, GameObject*> _activeSpawnList;
 };
 
 struct MapPoolAssignedCreature
 {
     Creature* creature;
-    uint32 poolId;
+    MapPoolCreatureTemplate* pool;
     MapPoolCreatureSpawn* spawnPoint;
     MapPoolCreatureInfo* info;
 };
@@ -200,7 +214,7 @@ struct MapPoolAssignedCreature
 struct MapPoolAssignedGameObject
 {
     GameObject* gameObject;
-    uint32 poolId;
+    MapPoolGameObjectTemplate* pool;
     MapPoolGameObjectSpawn* spawnPoint;
     MapPoolGameObjectInfo* info;
 };
@@ -220,12 +234,6 @@ private:
 
     std::unordered_map<uint32, uint32> _cellAreaZoneLastRespawnedCreatureMap;
     std::unordered_map<uint32, uint32> _cellAreaZoneLastRespawnedGameObjectMap;
-
-    // Pool active/inactive spawn lists
-    std::vector<MapPoolCreatureSpawn*> _inactiveCreatureSpawnList;
-    std::unordered_map<MapPoolCreatureSpawn*, Creature*> _activeCreatureSpawnList;
-    std::vector<MapPoolGameObjectSpawn*> _inactiveGameObjectSpawnList;
-    std::unordered_map<MapPoolGameObjectSpawn*, GameObject*> _activeGameObjectSpawnList;
 
     Map* ownerMap;
     uint32 ownerMapId;
@@ -285,8 +293,8 @@ private:
         deleteRespawnInfo(_gameObjectRespawnTimesByGridId, _gameObjectRespawnTimesByCellAreaZoneId, _gameObjectRespawnTimesByPoolSpawnPoint, poolId, spawnPointId, gridId, cellAreaZoneId, onlyDue);
     }
 
-    void buildCreatureData(CreatureData& cdata, MapPoolCreatureTemplate const* pool, MapPoolCreatureInfo const* info, MapPoolCreatureSpawn const* spawn);
-    void buildGameObjectData(GameObjectData& cdata, MapPoolGameObjectTemplate const* pool, MapPoolGameObjectInfo const* info, MapPoolGameObjectSpawn const* spawn);
+    void buildCreatureData(CreatureData* cdata, MapPoolCreatureTemplate const* pool, MapPoolCreatureInfo const* info, MapPoolCreatureSpawn const* spawn);
+    void buildGameObjectData(GameObjectData* cdata, MapPoolGameObjectTemplate const* pool, MapPoolGameObjectInfo const* info, MapPoolGameObjectSpawn const* spawn);
 
 public:
     MapPoolMgr(Map* map);
@@ -311,6 +319,8 @@ public:
     void RemoveCreatureRespawnTime(uint32 poolId = 0, uint32 spawnPointId = 0, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool respawnCreature = false, SQLTransaction respawntrans = nullptr);
     void RemoveGORespawnTime(uint32 poolId = 0, uint32 spawnPointId = 0, uint32 cellAreaZoneId = 0, uint32 gridId = 0, bool respawnObject = false, SQLTransaction respawntrans = nullptr);
     static void DeleteRespawnTimesInDB(uint16 mapId, uint32 instanceId);
+    Creature* SpawnSingleCreature(uint32 poolId);
+    GameObject* SpawnSingleGameObject(uint32 poodId);
 };
 
 #endif
