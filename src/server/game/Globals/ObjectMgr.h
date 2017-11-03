@@ -132,7 +132,9 @@ enum ScriptCommands
     SCRIPT_COMMAND_CLOSE_GOSSIP          = 33,               // source = Player
     SCRIPT_COMMAND_PLAYMOVIE             = 34,               // source = Player, datalong = movie id
     SCRIPT_COMMAND_MOVEMENT              = 35,               // source = Creature, datalong = MovementType, datalong2 = MovementDistance (spawndist f.ex.), dataint = pathid
-    SCRIPT_COMMAND_PLAY_ANIMKIT          = 36                // source = Creature, datalong = AnimKit id (NOT ON 3.3.5A, DON'T REUSE)
+    SCRIPT_COMMAND_PLAY_ANIMKIT          = 36,               // source = Creature, datalong = AnimKit id (NOT ON 3.3.5A, DON'T REUSE)
+    SCRIPT_COMMAND_SPAWNGROUP            = 37,               // source = WorldObject (summoner), datalong = spawn group ID, datalong2 = despawn delay, dataint (Flags: 0x1 = Force spawn 0x2 = Ignore Respawn time)
+    SCRIPT_COMMAND_DESPAWNGROUP          = 38                // source = WorldObject (summoner), datalong = spawn group ID
 };
 
 enum ChatType
@@ -405,6 +407,13 @@ struct ScriptInfo
             uint32 MovementDistance; // datalong2
             int32  Path;             // dataint
         } Movement;
+
+        struct
+        {
+            uint32 SpawnGroup;       // datalong
+            uint32 DespawnTimer;     // datalong2
+            int32 SpawnGroupFlags;   // dataint
+        } SpawnGroup;
     };
 
     std::string GetDebugInfo() const;

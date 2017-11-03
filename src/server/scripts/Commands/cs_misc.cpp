@@ -1891,30 +1891,63 @@ public:
         return true;
     }
 
-    static bool HandleRespawnCommand(ChatHandler* handler, char const* /*args*/)
+    static bool HandleRespawnCommand(ChatHandler* handler, char const* args)
     {
         Player* player = handler->GetSession()->GetPlayer();
 
-        // accept only explicitly selected target (not implicitly self targeting case)
-        Creature* target = player->GetTarget() ? handler->getSelectedCreature() : nullptr;
-        if (target)
+        if (!*args)
         {
-            if (target->IsPet())
+            // accept only explicitly selected target (not implicitly self targeting case)
+            Creature* target = player->GetTarget() ? handler->getSelectedCreature() : nullptr;
+            if (target)
             {
-                handler->SendSysMessage(LANG_SELECT_CREATURE);
-                handler->SetSentErrorMessage(true);
-                return false;
+                if (target->IsPet())
+                {
+                    handler->SendSysMessage(LANG_SELECT_CREATURE);
+                    handler->SetSentErrorMessage(true);
+                    return false;
+                }
+
+                if (target->isDead())
+                    target->Respawn();
+                return true;
             }
 
-            if (target->isDead())
-                target->Respawn();
+            // First handle any creatures that still have a corpse around
+            Trinity::RespawnDo u_do;
+            Trinity::WorldObjectWorker<Trinity::RespawnDo> worker(player, u_do);
+            Cell::VisitGridObjects(player, worker, player->GetGridActivationRange());
+
+            // Now handle any that had despawned, but had respawn time logged.
+            RespawnVector data;
+            player->GetMap()->GetRespawnInfo(data, SPAWN_TYPEMASK_ALL, 0);
+            if (!data.empty())
+            {
+                uint32 const gridId = Trinity::ComputeGridCoord(player->GetPositionX(), player->GetPositionY()).GetId();
+                for (RespawnInfo* info : data)
+                    if (info->gridId == gridId)
+                        player->GetMap()->RemoveRespawnTime(info, true);
+            }
+
             return true;
         }
+        uint32 range = 0;
+        ObjectGuid::LowType guidLow = 0;
 
-        // First handle any creatures that still have a corpse around
-        Trinity::RespawnDo u_do;
-        Trinity::WorldObjectWorker<Trinity::RespawnDo> worker(player, u_do);
-        Cell::VisitGridObjects(player, worker, player->GetGridActivationRange());
+        if (const char* rangeChar = strtok(const_cast<char*>(args), " "))
+            range = static_cast<uint32>(atoul(rangeChar));
+        if (const char* guidChar = strtok(nullptr, " "))
+            guidLow = static_cast<ObjectGuid::LowType>(atoul(guidChar));
+
+        // If we allow this they might respawn the whole map...
+        if (!range && !guidLow)
+            return false;
+
+        if (range > SIZE_OF_GRIDS)
+            range = SIZE_OF_GRIDS;
+
+        if (range > 0)
+            range *= range;
 
         // Now handle any that had despawned, but had respawn time logged.
         RespawnVector data;
@@ -1923,8 +1956,38 @@ public:
         {
             uint32 const gridId = Trinity::ComputeGridCoord(player->GetPositionX(), player->GetPositionY()).GetId();
             for (RespawnInfo* info : data)
-                if (info->gridId == gridId)
-                    player->GetMap()->RemoveRespawnTime(info, true);
+            {
+                WorldLocation respawnPos;
+                bool positionFound = false;
+
+                if (range > 0)
+                {
+                    if (info->type == SPAWN_TYPE_CREATURE)
+                    {
+                        if (CreatureData const* cData = sObjectMgr->GetCreatureData(info->spawnId))
+                        {
+                            respawnPos = cData->spawnPoint;
+                            positionFound = true;
+                        }
+                    }
+                    else if (info->type == SPAWN_TYPE_GAMEOBJECT)
+                    {
+                        if (GameObjectData const* goData = sObjectMgr->GetGameObjectData(info->spawnId))
+                        {
+                            respawnPos = goData->spawnPoint;
+                            positionFound = true;
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+
+                if (range == 0 || positionFound && respawnPos.GetExactDist2dSq(player->GetPosition()) <= range)
+                    if (guidLow == 0 || guidLow == info->spawnId)
+                        player->GetMap()->RemoveRespawnTime(info, true);
+            }
         }
 
         return true;

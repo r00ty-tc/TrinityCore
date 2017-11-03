@@ -322,6 +322,9 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         void SetRespawnCompatibilityMode(bool mode = true) { m_respawnCompatibilityMode = mode; }
         bool GetRespawnCompatibilityMode() { return m_respawnCompatibilityMode; }
 
+        void SetDespawnTimer(uint32 despawnMS) { m_despawnTimer = despawnMS; }
+        uint32 GetDespawnTimer() const { return m_despawnTimer; }
+
         static float _GetDamageMod(int32 Rank);
 
         float m_SightDistance, m_CombatDistance;
@@ -398,6 +401,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         CreatureData const* m_creatureData;
 
         uint16 m_LootMode;                                  // Bitmask (default: LOOT_MODE_DEFAULT) that determines what loot will be lootable
+        uint32 m_despawnTimer;
 
         bool IsInvisibleDueToDespawn() const override;
         bool CanAlwaysSee(WorldObject const* obj) const override;

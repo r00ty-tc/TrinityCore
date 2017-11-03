@@ -1433,6 +1433,12 @@ void SmartScript::ProcessAction(SmartScriptHolder& e, Unit* unit, uint32 var0, u
         }
         case SMART_ACTION_RESPAWN_TARGET:
         {
+            // First try to respawn via map
+            if (e.GetTargetType() == SMART_TARGET_CREATURE_GUID)
+                me->GetMap()->RemoveRespawnTime(SPAWN_TYPE_CREATURE, e.target.unitGUID.dbGuid, true);
+            else if (e.GetTargetType() == SMART_TARGET_GAMEOBJECT_GUID)
+                me->GetMap()->RemoveRespawnTime(SPAWN_TYPE_GAMEOBJECT, e.target.goGUID.dbGuid, true);
+
             for (WorldObject* target : targets)
             {
                 if (IsCreature(target))

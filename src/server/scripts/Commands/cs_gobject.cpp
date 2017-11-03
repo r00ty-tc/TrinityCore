@@ -613,6 +613,8 @@ public:
         if (!param1)
             return false;
 
+        GameObject* thisGO = nullptr;
+
         if (strcmp(param1, "guid") == 0)
         {
             char* tail = strtok(nullptr, "");
@@ -624,6 +626,8 @@ public:
             if (!data)
                 return false;
             entry = data->id;
+            if (Player* player = handler->GetSession()->GetPlayer())
+                thisGO = player->GetMap()->GetGameObjectBySpawnId(guidLow);
         }
         else
         {
@@ -632,15 +636,17 @@ public:
 
         GameObjectTemplate const* gameObjectInfo = sObjectMgr->GetGameObjectTemplate(entry);
 
-        GameObject* thisGO = nullptr;
 
         if (!gameObjectInfo)
             return false;
 
-        if (*args && handler->GetSession()->GetPlayer())
-            thisGO = handler->GetSession()->GetPlayer()->FindNearestGameObject(entry, 30);
-        else if (handler->getSelectedObject() && handler->getSelectedObject()->GetTypeId() == TYPEID_GAMEOBJECT)
-            thisGO = handler->getSelectedObject()->ToGameObject();
+        if (!thisGO)
+        {
+            if (*args && handler->GetSession()->GetPlayer())
+                thisGO = handler->GetSession()->GetPlayer()->FindNearestGameObject(entry, 30);
+            else if (handler->getSelectedObject() && handler->getSelectedObject()->GetTypeId() == TYPEID_GAMEOBJECT)
+                thisGO = handler->getSelectedObject()->ToGameObject();
+        }
 
         type = gameObjectInfo->type;
         displayId = gameObjectInfo->displayId;
@@ -661,21 +667,19 @@ public:
                 float dist = thisGO->GetExactDist(&playerPos);
                 handler->PSendSysMessage(LANG_SPAWNINFO_DISTANCEFROMPLAYER, dist);
             }
+
+            if (thisGO->GetGameObjectData() && thisGO->GetGameObjectData()->spawnGroupData->groupId)
+            {
+                SpawnGroupTemplateData const* groupData = thisGO->GetGameObjectData()->spawnGroupData;
+                handler->PSendSysMessage(LANG_SPAWNINFO_GROUP_ID, groupData->name.c_str(), groupData->groupId, groupData->flags, thisGO->GetMap()->IsSpawnGroupActive(groupData->groupId));
+            }
+            handler->PSendSysMessage(LANG_SPAWNINFO_COMPATIBILITY_MODE, thisGO->GetRespawnCompatibilityMode());
+
         }
         handler->PSendSysMessage(LANG_GOINFO_ENTRY, entry);
         handler->PSendSysMessage(LANG_GOINFO_TYPE, type);
         handler->PSendSysMessage(LANG_GOINFO_LOOTID, lootId);
         handler->PSendSysMessage(LANG_GOINFO_DISPLAYID, displayId);
-        if (WorldObject* object = handler->getSelectedObject())
-        {
-            if (object->ToGameObject() && object->ToGameObject()->GetGameObjectData() && object->ToGameObject()->GetGameObjectData()->spawnGroupData->groupId)
-            {
-                SpawnGroupTemplateData const* groupData = object->ToGameObject()->GetGameObjectData()->spawnGroupData;
-                handler->PSendSysMessage(LANG_SPAWNINFO_GROUP_ID, groupData->name.c_str(), groupData->groupId, groupData->flags, object->GetMap()->IsSpawnGroupActive(groupData->groupId));
-            }
-            if (object->ToGameObject())
-                handler->PSendSysMessage(LANG_SPAWNINFO_COMPATIBILITY_MODE, object->ToGameObject()->GetRespawnCompatibilityMode());
-        }
         handler->PSendSysMessage(LANG_GOINFO_NAME, name.c_str());
         handler->PSendSysMessage(LANG_GOINFO_SIZE, gameObjectInfo->size);
 

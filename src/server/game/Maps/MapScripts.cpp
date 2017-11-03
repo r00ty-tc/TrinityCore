@@ -590,13 +590,14 @@ void Map::ScriptsProcess()
                         break;
                     }
 
+                    LootState lootState = pGO->getLootState();
+                    GOState goState = pGO->GetGoState();
                     // Check that GO is not spawned
                     if (!pGO->isSpawned())
                     {
                         int32 nTimeToDespawn = std::max(5, int32(step.script->RespawnGameobject.DespawnDelay));
                         pGO->SetLootState(GO_READY);
                         pGO->SetRespawnTime(nTimeToDespawn);
-
                         pGO->GetMap()->AddToMap(pGO);
                     }
                 }
@@ -894,7 +895,29 @@ void Map::ScriptsProcess()
                     }
                 }
                 break;
-
+            case SCRIPT_COMMAND_SPAWNGROUP:
+                if (WorldObject* summonObject = _GetScriptWorldObject(source, true, step.script))
+                {
+                    bool forceSpawn = step.script->SpawnGroup.SpawnGroupFlags & SpawnGroupCommandFlags::FLAG_FORCESPAWN;
+                    bool ignoreRespawn = step.script->SpawnGroup.SpawnGroupFlags & SpawnGroupCommandFlags::FLAG_IGNORERESPAWNTIME;
+                    std::vector<WorldObject*> spawnList;
+                    summonObject->GetMap()->SpawnGroupSpawn(step.script->SpawnGroup.SpawnGroup, ignoreRespawn, forceSpawn, &spawnList);
+                    if (step.script->SpawnGroup.DespawnTimer)
+                    {
+                        for (WorldObject* spawn : spawnList)
+                        {
+                            if (Creature* creature = spawn->ToCreature())
+                                creature->SetDespawnTimer(step.script->SpawnGroup.DespawnTimer);
+                            else if (GameObject* go = spawn->ToGameObject())
+                                go->SetDespawnTimer(step.script->SpawnGroup.DespawnTimer);
+                        }
+                    }
+                }
+                break;
+            case SCRIPT_COMMAND_DESPAWNGROUP:
+                if (WorldObject* summonObject = _GetScriptWorldObject(source, true, step.script))
+                    summonObject->GetMap()->SpawnGroupDespawn(step.script->SpawnGroup.SpawnGroup, true);
+                break;
             default:
                 TC_LOG_ERROR("scripts", "Unknown script command %s.", step.script->GetDebugInfo().c_str());
                 break;

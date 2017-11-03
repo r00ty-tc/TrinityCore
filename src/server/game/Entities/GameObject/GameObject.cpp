@@ -123,6 +123,7 @@ GameObject::GameObject() : WorldObject(false), MapObject(),
     m_packedRotation = 0;
 
     m_spawnId = 0;
+    m_despawnTimer = 0;
 
     m_lootRecipientGroup = 0;
     m_groupLootTimer = 0;
@@ -404,6 +405,15 @@ void GameObject::Update(uint32 diff)
         AI()->UpdateAI(diff);
     else if (!AIM_Initialize())
         TC_LOG_ERROR("misc", "Could not initialize GameObjectAI");
+
+    // If there's a timed despawn, work with it
+    if (m_despawnTimer > 0)
+    {
+        if (m_despawnTimer > diff)
+            m_despawnTimer -= diff;
+        else
+            AddObjectToRemoveList();
+    }
 
     switch (m_lootState)
     {

@@ -83,6 +83,12 @@ enum SpellEffIndex : uint8;
 enum WeatherState : uint32;
 enum XPColorChar : uint8;
 
+enum SpawnGroupCommandFlags
+{
+    FLAG_FORCESPAWN = 0x1,
+    FLAG_IGNORERESPAWNTIME = 0x2
+};
+
 #define VISIBLE_RANGE       166.0f                          //MAX visible range (size of grid)
 
 

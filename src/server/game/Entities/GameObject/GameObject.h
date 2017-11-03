@@ -279,6 +279,8 @@ class TC_GAME_API GameObject : public WorldObject, public GridObject<GameObject>
 
         GameObjectModel* m_model;
         void GetRespawnPosition(float &x, float &y, float &z, float* ori = nullptr) const;
+        void SetDespawnTimer(uint32 despawnMS) { m_despawnTimer = despawnMS; }
+        uint32 GetDespawnTimer() const { return m_despawnTimer; }
 
         Transport* ToTransport() { if (GetGOInfo()->type == GAMEOBJECT_TYPE_MO_TRANSPORT) return reinterpret_cast<Transport*>(this); else return nullptr; }
         Transport const* ToTransport() const { if (GetGOInfo()->type == GAMEOBJECT_TYPE_MO_TRANSPORT) return reinterpret_cast<Transport const*>(this); else return nullptr; }
@@ -332,6 +334,7 @@ class TC_GAME_API GameObject : public WorldObject, public GridObject<GameObject>
         uint32 m_lootRecipientGroup;
         uint16 m_LootMode;                                  // bitmask, default LOOT_MODE_DEFAULT, determines what loot will be lootable
         uint32 m_lootGenerationTime;
+        uint32 m_despawnTimer;
 
         ObjectGuid m_linkedTrap;
 
