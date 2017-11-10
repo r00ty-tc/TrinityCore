@@ -22332,12 +22332,14 @@ void Player::SendInitialVisiblePackets(Unit* target) const
         // Update players with any current spell casting/channelling that should be visible
         if (Spell* spell = target->GetCurrentSpell(CURRENT_GENERIC_SPELL))
         {
-            spell->SendSpellStart(this);
-            spell->SendResumeCastBar(this);
+            if (spell->GetCastTime() > 0)
+            {
+                spell->SendSpellStart(this);
+                spell->SendResumeCastBar(this);
+            }
         }
         else if (Spell* spell = target->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
         {
-            spell->SendSpellStart(this);
             spell->SendResumeCastBar(this);
         }
     }
@@ -22366,8 +22368,6 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
         {
             target->BuildCreateUpdateBlockForPlayer(&data, this);
             UpdateVisibilityOf_helper(m_clientGUIDs, target, visibleNow);
-            if (Unit* unit = target->ToUnit())
-                visibleNow.insert(unit);
 
             #ifdef TRINITY_DEBUG
                 TC_LOG_DEBUG("maps", "Object %u (Type: %u, Entry: %u) is visible now for player %u. Distance = %f", target->GetGUID().GetCounter(), target->GetTypeId(), target->GetEntry(), GetGUID().GetCounter(), GetDistance(target));

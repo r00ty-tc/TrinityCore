@@ -3933,6 +3933,9 @@ void Spell::SendResumeCastBar(Player const* targetPlayer)
     if (!targetPlayer)
         return;
 
+    if (!m_casttime && !m_channeledDuration)
+        return;
+
     WorldPacket data(SMSG_RESUME_CAST_BAR, (8+8+4+4+4));
     data << m_caster->GetPackGUID();
 
@@ -3942,7 +3945,7 @@ void Spell::SendResumeCastBar(Player const* targetPlayer)
         data << m_caster->GetPackGUID();
     data << uint32(m_spellInfo->Id);
     data << int32(m_timer);
-    data << int32(m_casttime);
+    data << int32(m_casttime ? m_casttime : m_channeledDuration);
     targetPlayer->GetSession()->SendPacket(&data);
 }
 
