@@ -3933,6 +3933,10 @@ void Spell::SendResumeCastBar(Player const* targetPlayer)
     if (!targetPlayer)
         return;
 
+    // Resend spell if chanelled spell has multiple targets
+    if (IsChannelActive() && m_UniqueTargetInfo.size() + m_UniqueGOTargetInfo.size() > 1)
+        SendChannelUpdateChainTargets(targetPlayer);
+
     if (!m_casttime && !m_channeledDuration)
         return;
 
@@ -4375,6 +4379,34 @@ void Spell::SendChannelUpdate(uint32 time)
     data << uint32(time);
 
     m_caster->SendMessageToSet(&data, true);
+}
+
+void Spell::SendChannelUpdateChainTargets(Player const* targetPlayer)
+{
+    // Only for multi target
+    if (m_UniqueTargetInfo.size() + m_UniqueGOTargetInfo.size() <= 1)
+        return;
+
+    WorldPacket data(SMSG_SPELL_UPDATE_CHAIN_TARGETS, 8 + 4 + 4 + 8);
+    data << uint64(m_caster->GetGUID());
+    data << uint32(m_spellInfo->Id);
+    uint32 hitCount = 0;
+    for (auto target : m_UniqueTargetInfo)
+        if (target.missCondition == SPELL_MISS_NONE)
+            hitCount++;
+    hitCount += m_UniqueGOTargetInfo.size();
+
+    data << hitCount;
+    for (auto target : m_UniqueTargetInfo)
+        if (target.missCondition == SPELL_MISS_NONE)
+            data << uint64(target.targetGUID);
+    for (auto target : m_UniqueGOTargetInfo)
+        data << uint64(target.targetGUID);
+
+    if (targetPlayer)
+        targetPlayer->GetSession()->SendPacket(&data);
+    else
+        m_caster->SendMessageToSet(&data, true);
 }
 
 void Spell::SendChannelStart(uint32 duration)

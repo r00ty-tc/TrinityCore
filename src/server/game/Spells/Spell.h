@@ -479,6 +479,7 @@ class TC_GAME_API Spell
         void ExecuteLogEffectResurrect(uint8 effIndex, Unit* target);
         void SendInterrupted(uint8 result);
         void SendChannelUpdate(uint32 time);
+        void SendChannelUpdateChainTargets(Player const* targetPlayer = nullptr);
         void SendChannelStart(uint32 duration);
         void SendResurrectRequest(Player* target);
 
