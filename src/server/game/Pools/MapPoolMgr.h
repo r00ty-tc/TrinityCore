@@ -88,7 +88,18 @@ struct MapPoolGameObject : MapPoolItem
     MapPoolGameObjectOverride* overrideData;
 };
 
-struct MapPoolCreatureOverride
+struct MapPoolOverride
+{
+    PoolType type;
+    uint32 spawntimeSecsMin;
+    uint32 spawntimeSecsMax;
+    std::string aiName;
+    std::string scriptName;
+    MapPoolCreatureOverride* ToCreatureOverride() { return type == POOLTYPE_CREATURE ? reinterpret_cast<MapPoolCreatureOverride*>(this) : nullptr; }
+    MapPoolGameObjectOverride* ToGameObjectOverride() { return type == POOLTYPE_GAMEOBJECT ? reinterpret_cast<MapPoolGameObjectOverride*>(this) : nullptr; }
+};
+
+struct MapPoolCreatureOverride : MapPoolOverride
 {
     uint32 modelId;
     uint8 equipmentId;
@@ -100,22 +111,14 @@ struct MapPoolCreatureOverride
     uint32 dynamicFlags;
     uint8 movementType;
     float spawnDist;
-    uint32 spawntimeSecsMin;
-    uint32 spawntimeSecsMax;
     uint32 corpsetimeSecsLoot;
     uint32 corpsetimeSecsNoLoot;
-    std::string aiName;
-    std::string scriptName;
 };
 
-struct MapPoolGameObjectOverride
+struct MapPoolGameObjectOverride : MapPoolOverride
 {
     uint8 animProgress;
     uint8 state;
-    uint32 spawntimeSecsMin;
-    uint32 spawntimeSecsMax;
-    std::string aiName;
-    std::string scriptName;
 };
 
 struct MapPoolSpawn
@@ -152,18 +155,24 @@ public:
 
 class TC_GAME_API MapPoolMgr
 {
-
+    typedef std::pair<uint32, uint32> PointEntryPair;
 private:
     Map* ownerMap;
     uint32 ownerMapId;
     std::map<uint32, MapPoolEntry> _poolMap;
-    MapPoolEntry* getPool(uint32 poolId);
+    std::map<PointEntryPair, MapPoolCreatureOverride*> _poolCreatureOverrideMap;
+    std::map<PointEntryPair, MapPoolGameObjectOverride*> _poolGameObjectOverrideMap;
+    MapPoolEntry* _getPool(uint32 poolId);
+    MapPoolCreatureOverride* _getCreatureOverride(uint32 pointId, uint32 entry);
+    MapPoolGameObjectOverride* _getGameObjectOverride(uint32 pointId, uint32 entry);
 
 public:
     MapPoolMgr(Map* map);
     ~MapPoolMgr();
     void LoadMapPools();
     MapPoolEntry const* GetPool(uint32 poolId);
+    MapPoolCreatureOverride const* GetCreatureOverride(uint32 pointId, uint32 entry);
+    MapPoolGameObjectOverride const* GetGameObjectOverride(uint32 pointId, uint32 entry);
 };
 
 #endif

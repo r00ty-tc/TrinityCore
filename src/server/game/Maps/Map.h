@@ -280,6 +280,9 @@ struct ZoneDynamicInfo
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
 #define MAP_INVALID_ZONE      0xFFFFFFFF
 
+struct MapPoolCreatureOverride;
+struct MapPoolGameObjectOverride;
+
 struct MapPoolSpawnPoint
 {
     uint32 mapId;
@@ -295,6 +298,8 @@ struct MapPoolSpawnPoint
     float rotation1;
     float rotation2;
     float rotation3;
+    MapPoolCreatureOverride* creatureOverride;
+    MapPoolGameObjectOverride* gameObjectOverride;
 };
 typedef std::map<uint32, MapPoolSpawnPoint*> PoolSpawnPointMap;
 
