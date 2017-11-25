@@ -300,8 +300,10 @@ struct MapPoolSpawnPoint
     float rotation3;
     MapPoolCreatureOverride* creatureOverride;
     MapPoolGameObjectOverride* gameObjectOverride;
+    WorldObject* currentObject;
+    std::vector<WorldObject*> oldObjects;
 };
-typedef std::map<uint32, MapPoolSpawnPoint*> PoolSpawnPointMap;
+typedef std::unordered_map<uint32, MapPoolSpawnPoint*> PoolSpawnPointMap;
 
 typedef std::map<uint32/*leaderDBGUID*/, CreatureGroup*>        CreatureGroupHolderType;
 

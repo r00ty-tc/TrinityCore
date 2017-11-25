@@ -4446,6 +4446,8 @@ void Map::LoadSpawnPoints()
             thisSpawn->rotation3 = fields[11].GetFloat();
             thisSpawn->creatureOverride = nullptr;
             thisSpawn->gameObjectOverride = nullptr;
+            thisSpawn->currentObject = nullptr;
+            thisSpawn->oldObjects.clear();
 
             // Add this spawn
             m_spawnPoints[thisSpawn->pointId] = thisSpawn;

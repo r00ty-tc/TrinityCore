@@ -1539,9 +1539,9 @@ bool Creature::CreateFromProto(ObjectGuid::LowType guidlow, uint32 entry, Creatu
     return true;
 }
 
-bool Creature::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate)
+bool Creature::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool allowDuplicate, CreatureData* cData)
 {
-    if (!allowDuplicate)
+    if (!allowDuplicate && spawnId != 0)
     {
         // If an alive instance of this spawnId is already found, skip creation
         // If only dead instance(s) exist, despawn them and spawn a new (maybe also dead) version
@@ -1571,7 +1571,7 @@ bool Creature::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, 
         }
     }
 
-    CreatureData const* data = sObjectMgr->GetCreatureData(spawnId);
+    CreatureData const* data = cData ? cData : sObjectMgr->GetCreatureData(spawnId);
 
     if (!data)
     {

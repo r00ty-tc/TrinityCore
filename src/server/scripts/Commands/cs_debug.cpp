@@ -36,6 +36,7 @@ EndScriptData */
 #include "M2Stores.h"
 #include "MapManager.h"
 #include "ObjectAccessor.h"
+#include "MapPoolMgr.h"
 #include "ObjectMgr.h"
 #include "RBAC.h"
 #include "SpellMgr.h"
@@ -114,6 +115,7 @@ public:
             { "instancespawn", rbac::RBAC_PERM_COMMAND_DEBUG_INSTANCESPAWN, false, &HandleDebugInstanceSpawns,          "" },
             { "dummy",         rbac::RBAC_PERM_COMMAND_DEBUG_DUMMY,         false, &HandleDebugDummyCommand,            "" },
             { "asan",          rbac::RBAC_PERM_COMMAND_DEBUG_ASAN,          true,  nullptr,                             "", debugAsanCommandTable },
+            { "poolspawn",     rbac::RBAC_PERM_COMMAND_DEBUG,               false, &HandleDebugPoolSpawn,               "" },
         };
         static std::vector<ChatCommand> commandTable =
         {
@@ -121,6 +123,17 @@ public:
             { "wpgps",         rbac::RBAC_PERM_COMMAND_WPGPS,               false, &HandleWPGPSCommand,                 "" },
         };
         return commandTable;
+    }
+
+    static bool HandleDebugPoolSpawn(ChatHandler* handler, char const* args)
+    {
+         // For now, just testing
+        if (Player* player = handler->GetSession()->GetPlayer())
+        {
+            player->GetMap()->GetMapPoolMgr()->SpawnCreatureManual(10, 1501, 11);
+            player->GetMap()->GetMapPoolMgr()->SpawnCreatureManual(10, 1502, 12);
+        }
+        return true;
     }
 
     static bool HandleDebugPlayCinematicCommand(ChatHandler* handler, char const* args)

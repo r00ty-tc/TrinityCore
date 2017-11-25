@@ -101,8 +101,8 @@ void WorldDatabaseConnection::DoPrepareStatements()
     PrepareStatement(WORLD_SEL_MAPPOOL_SPAWNS, "SELECT poolId, pointId FROM mappool_spawns WHERE map = ?", CONNECTION_SYNCH);
     PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_INFO, "SELECT poolId, entry, chance, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags FROM mappool_creature WHERE map = ?", CONNECTION_SYNCH);
     PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_INFO, "SELECT poolId, entry, chance, animProgress, state FROM mappool_gameobject WHERE map = ?", CONNECTION_SYNCH);
-    PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_OVERRIDE, "SELECT poolId, entry, pointId, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags, MovementType, spawnDist, spawntimeSecsMin, spawntimeSecsMax, corpsetimeSecsLoot, corpsetimeSecsNoLoot, AIName, ScriptName FROM mappool_creature_override WHERE map = ?", CONNECTION_SYNCH);
-    PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_OVERRIDE, "SELECT poolId, entry, pointId, animProgress, state, spawntimeSecsMin, spawntimeSecsMax, AIName, ScriptName FROM mappool_gameobject_override WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_OVERRIDE, "SELECT poolId, entry, pointId, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags, MovementType, spawnDist, phaseMask, spawnMask, spawntimeSecsMin, spawntimeSecsMax, corpsetimeSecsLoot, corpsetimeSecsNoLoot, path_id, mount, bytes1, bytes2, emote, auras, AIName, ScriptName FROM mappool_creature_override WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_OVERRIDE, "SELECT poolId, entry, pointId, animProgress, state, phaseMask, spawnMask, spawntimeSecsMin, spawntimeSecsMax, parent_rotation0, parent_rotation1, parent_rotation2, parent_rotation3, invisibilityType, invisibilityValue, AIName, ScriptName FROM mappool_gameobject_override WHERE map = ?", CONNECTION_SYNCH);
 }
 
 WorldDatabaseConnection::WorldDatabaseConnection(MySQLConnectionInfo& connInfo) : MySQLConnection(connInfo)
