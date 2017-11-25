@@ -179,8 +179,8 @@ private:
     std::unordered_map<ObjectGuid, CreatureData*> _poolCreatureDataMap;
     std::unordered_map<ObjectGuid ,GameObjectData*> _poolGameObjectDataMap;
     MapPoolEntry* _getPool(uint32 poolId);
-    static MapPoolSpawnPoint* _getSpawnPoint(MapPoolEntry* pool, uint32 pointId);
-    static MapPoolCreature* _getSpawnCreature(MapPoolEntry* pool, uint32 entry);
+    static MapPoolSpawnPoint* _getSpawnPoint(MapPoolEntry const* pool, uint32 pointId);
+    static MapPoolCreature* _getSpawnCreature(MapPoolEntry const* pool, uint32 entry);
     static MapPoolGameObject* _getSpawnGameObject(MapPoolEntry* pool, uint32 entry);
     MapPoolCreatureOverride* _getCreatureOverride(uint32 pointId, uint32 entry);
     MapPoolGameObjectOverride* _getGameObjectOverride(uint32 pointId, uint32 entry);
@@ -201,6 +201,8 @@ public:
     CreatureData const* GetCreatureData(ObjectGuid guid);
     GameObjectData const* GetGameObjectData(ObjectGuid guid);
     bool SpawnCreatureManual(uint32 poolId, uint32 entry, uint32 pointId) { return (SpawnCreature(poolId, entry ,pointId) != nullptr); }
+    void HandleDespawn(WorldObject* obj);
+    void HandleDeath(Creature* obj);
 };
 
 #endif

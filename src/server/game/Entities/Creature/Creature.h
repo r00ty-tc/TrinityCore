@@ -35,7 +35,7 @@ class Quest;
 class Player;
 class SpellInfo;
 class WorldSession;
-struct MapPoolEntry;
+class MapPoolEntry;
 struct MapPoolSpawnPoint;
 struct MapPoolCreature;
 

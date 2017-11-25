@@ -28,6 +28,7 @@
 #include "Item.h"
 #include "Log.h"
 #include "Map.h"
+#include "MapPoolMgr.h"
 #include "MovementInfo.h"
 #include "MovementPacketBuilder.h"
 #include "ObjectAccessor.h"
@@ -1048,6 +1049,9 @@ void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/)
 
     if (Transport* transport = GetTransport())
         transport->RemovePassenger(this);
+
+    if (Creature* creature = ToCreature())
+        GetMap()->GetMapPoolMgr()->HandleDespawn(this);
 }
 
 void WorldObject::_Create(ObjectGuid::LowType guidlow, HighGuid guidhigh, uint32 phaseMask)

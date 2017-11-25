@@ -34,6 +34,8 @@
 #include "InstanceScript.h"
 #include "Log.h"
 #include "LootMgr.h"
+#include "Map.h"
+#include "MapPoolMgr.h"
 #include "MotionMaster.h"
 #include "MoveSpline.h"
 #include "ObjectAccessor.h"
@@ -265,6 +267,9 @@ Creature::Creature(bool isWorldObject): Unit(isWorldObject), MapObject(), m_grou
 
     ResetLootMode(); // restore default loot mode
     m_isTempWorldObject = false;
+    m_poolEntry = nullptr;
+    m_poolCreature = nullptr;
+    m_poolPoint = nullptr;
 }
 
 void Creature::AddToWorld()
@@ -1944,6 +1949,8 @@ void Creature::setDeathState(DeathState s)
 
         if (needsFalling)
             GetMotionMaster()->MoveFall();
+
+        GetMap()->GetMapPoolMgr()->HandleDeath(this);
 
         Unit::setDeathState(CORPSE);
     }

@@ -664,7 +664,7 @@ MapPoolEntry* MapPoolMgr::_getPool(uint32 poolId)
     return &pool->second;
 }
 
-MapPoolSpawnPoint* MapPoolMgr::_getSpawnPoint(MapPoolEntry* pool, uint32 pointId)
+MapPoolSpawnPoint* MapPoolMgr::_getSpawnPoint(MapPoolEntry const* pool, uint32 pointId)
 {
     std::vector<MapPoolSpawnPoint*>::const_iterator spawnItr = std::find_if(pool->spawnList.begin(), pool->spawnList.end(), [pointId](std::vector<MapPoolSpawnPoint*>::value_type const& spawns)
     {
@@ -677,7 +677,7 @@ MapPoolSpawnPoint* MapPoolMgr::_getSpawnPoint(MapPoolEntry* pool, uint32 pointId
     return *spawnItr;
 }
 
-MapPoolCreature* MapPoolMgr::_getSpawnCreature(MapPoolEntry* pool, uint32 entry)
+MapPoolCreature* MapPoolMgr::_getSpawnCreature(MapPoolEntry const* pool, uint32 entry)
 {
     std::vector<MapPoolItem*>::const_iterator entryItr = std::find_if(pool->itemList.begin(), pool->itemList.end(), [entry](std::vector<MapPoolItem*>::value_type const& item)
     {
@@ -744,6 +744,64 @@ CreatureData const* MapPoolMgr::GetCreatureData(ObjectGuid guid)
 GameObjectData const* MapPoolMgr::GetGameObjectData(ObjectGuid guid)
 {
     return _getGameObjectData(guid);
+}
+
+void MapPoolMgr::HandleDespawn(WorldObject* obj)
+{
+    if (Creature* creature = obj->ToCreature())
+    {
+        if (MapPoolEntry const* pool = creature->GetPoolEntry())
+        {
+            if (MapPoolSpawnPoint const* spawnPoint = creature->GetPoolPoint())
+            {
+                // Get real spawnpoint
+                MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
+                ObjectGuid const guid = obj->GetGUID();
+                std::vector<WorldObject*>::const_iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [guid](std::vector<WorldObject*>::value_type const& item)
+                {
+                    return (item->GetGUID() == guid);
+                });
+
+                if (itr != point->oldObjects.end())
+                    point->oldObjects.erase(itr);
+
+                // In case of instant despawn
+                if (point->currentObject && point->currentObject->GetGUID() == guid)
+                    point->currentObject = nullptr;
+
+                _poolCreatureDataMap.erase(obj->GetGUID());
+            }
+
+        }
+    }
+}
+
+void MapPoolMgr::HandleDeath(Creature* obj)
+{
+    if (MapPoolEntry const* pool = obj->GetPoolEntry())
+    {
+        if (MapPoolSpawnPoint const* spawnPoint = obj->GetPoolPoint())
+        {
+            // Get real spawnpoint
+            MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
+
+            // Check if current object is this one
+            if (point->currentObject->GetGUID() == obj->GetGUID())
+            {
+
+                // Add to old objects and unlink this spawnpoint
+                std::vector<WorldObject*>::const_iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [obj](std::vector<WorldObject*>::value_type const& item)
+                {
+                    return obj->GetGUID() == item->GetGUID();
+                });
+
+                if (itr == point->oldObjects.end())
+                    point->oldObjects.push_back(obj);
+
+                point->currentObject = nullptr;
+            }
+        }
+    }
 }
 
 CreatureData* MapPoolMgr::_getCreatureData(ObjectGuid guid)
