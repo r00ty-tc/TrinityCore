@@ -25,6 +25,7 @@ CREATE TABLE `mappool_hierarchy`
   `map` smallint(5) unsigned NOT NULL DEFAULT '0',
   `poolId` mediumint(8) unsigned NOT NULL,
   `childPoolId` mediumint(8) unsigned NOT NULL,
+  `chance` float NOT NULL,
   PRIMARY KEY (`map`, `poolId`, `childPoolId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Hierarchy';
 

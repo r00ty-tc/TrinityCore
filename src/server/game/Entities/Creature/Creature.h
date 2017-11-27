@@ -369,7 +369,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         }
         MapPoolEntry const* GetPoolEntry() const { return m_poolEntry; }
         MapPoolSpawnPoint const* GetPoolPoint() const { return m_poolPoint; }
-        MapPoolCreature const* GetyPoolCreature() const { return m_poolCreature; }
+        MapPoolCreature const* GetPoolCreature() const { return m_poolCreature; }
 
         void AtEnterCombat() override;
         void AtExitCombat() override;

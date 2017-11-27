@@ -30,6 +30,8 @@ struct MapPoolCreature;
 struct MapPoolGameObjectOverride;
 struct MapPoolGameObject;
 struct MapPoolSpawn;
+class GameObjectData;
+class CreatureData;
 
 enum PoolType
 {
@@ -145,11 +147,19 @@ struct MapPoolSpawn
 
 class MapPoolEntry
 {
+    friend MapPoolMgr;
+private:
+    MapPoolMgr* ownerManager;
+    void UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const;
+
 public:
     MapPoolTemplate poolData;
     PoolType type;
     MapPoolEntry* parentPool;
     MapPoolEntry* topPool;
+    uint32 spawnsThisPool;
+    uint32 spawnsAggregate;
+    float chance;
     std::vector<MapPoolEntry*> childPools;
     std::vector<MapPoolSpawnPoint*> spawnList;
     std::vector<MapPoolItem*> itemList;
@@ -165,10 +175,16 @@ public:
     bool CheckHierarchy(uint32 poolId, bool callingSelf = false) const;
 
     MapPoolEntry* GetTopPool() const { return parentPool == nullptr ? const_cast<MapPoolEntry*>(this) : parentPool->GetTopPool(); }
+    uint32 GetMaxSpawnable();
+    uint32 GetMinSpawnable() const;
+    void AdjustSpawned(int adjust, bool onlyAggregate = false);
+    bool SpawnSingle();
+    void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }
 };
 
 class TC_GAME_API MapPoolMgr
 {
+    friend MapPoolEntry;
     typedef std::pair<uint32, uint32> PointEntryPair;
 private:
     Map* ownerMap;
@@ -203,6 +219,10 @@ public:
     bool SpawnCreatureManual(uint32 poolId, uint32 entry, uint32 pointId) { return (SpawnCreature(poolId, entry ,pointId) != nullptr); }
     void HandleDespawn(WorldObject* obj);
     void HandleDeath(Creature* obj);
+    static MapPoolCreature const* GetSpawnCreature(MapPoolEntry const* pool, uint32 entry) { return _getSpawnCreature(pool, entry); }
+    static MapPoolGameObject const* GetSpawnGameObject(MapPoolEntry* pool, uint32 entry) { return _getSpawnGameObject(pool, entry); }
+    time_t GenerateRespawnTime(WorldObject* obj);
+    uint32 SpawnPool(uint32 poolId, uint32 items = 0);
 };
 
 #endif

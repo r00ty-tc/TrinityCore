@@ -23,9 +23,12 @@
 #include <combaseapi.h>
 #include <boost/container/flat_set.hpp>
 #include <Creature.h>
+#include "CreatureData.h"
 #include <GameObject.h>
+#include "GameObjectData.h"
 #include "SpellMgr.h"
 #include "SpellInfo.h"
+#include "Random.h"
 
 // Checks if poolId is anywhere in the hierarchy already
 bool MapPoolEntry::CheckHierarchy(uint32 poolId, bool callingSelf) const
@@ -169,13 +172,14 @@ void MapPoolMgr::LoadMapPools()
             thisPool->topPool = nullptr;
             thisPool->childPools.clear();
             thisPool->spawnList.clear();
+            thisPool->SetOwnerPoolMgr(this);
             ++pools;
         } while (result->NextRow());
     }
 
     // Read Pool hierarchy
-    //        0       1
-    // SELECT poolId, childPoolId FROM mappool_hierarchy WHERE map = ?
+    //        0       1        2
+    // SELECT poolId, pointId, chance FROM mappool_spawns WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_HIERARCHY);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -198,6 +202,7 @@ void MapPoolMgr::LoadMapPools()
                 {
                     thisPool->childPools.push_back(childPool);
                     childPool->parentPool = thisPool;
+                    thisPool->chance = fields[2].GetFloat();
                 }
                 else
                 {
@@ -231,6 +236,14 @@ void MapPoolMgr::LoadMapPools()
 
             if (MapPoolEntry* thisPool = _getPool(poolId))
             {
+                // Fail if adding spawns to a pool with children
+                // Only botton level pools can have spawns, upper/mid level pools are for organization of pools
+                if (thisPool->childPools.size() != 0)
+                {
+                    TC_LOG_FATAL("server.loading", "[Map %u] Attempt to add spawnpoints to pool %u with children", ownerMapId, poolId);
+                    ABORT();
+                }
+
                 // Check if point already found (shouldn't be possible)
                 for (MapPoolSpawnPoint* pointData : thisPool->spawnList)
                 {
@@ -270,6 +283,14 @@ void MapPoolMgr::LoadMapPools()
 
             if (MapPoolEntry* thisPool = _getPool(poolId))
             {
+                // Fail if adding entries to a pool with children
+                // Only botton level pools can have entries, upper/mid level pools are for organization of pools
+                if (thisPool->childPools.size() != 0)
+                {
+                    TC_LOG_FATAL("server.loading", "[Map %u] Attempt to add creature info to pool %u with children", ownerMapId, poolId);
+                    ABORT();
+                }
+
                 // Verify this pool is for creatures
                 if (thisPool->type != POOLTYPE_CREATURE)
                 {
@@ -339,6 +360,14 @@ void MapPoolMgr::LoadMapPools()
 
             if (MapPoolEntry* thisPool = _getPool(poolId))
             {
+                // Fail if adding entries to a pool with children
+                // Only botton level pools can have entries, upper/mid level pools are for organization of pools
+                if (thisPool->childPools.size() != 0)
+                {
+                    TC_LOG_FATAL("server.loading", "[Map %u] Attempt to add gameobject info to pool %u with children", ownerMapId, poolId);
+                    ABORT();
+                }
+
                 // Verify this pool is for gameobjects
                 if (thisPool->type != POOLTYPE_GAMEOBJECT)
                 {
@@ -767,13 +796,20 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj)
 
                 // In case of instant despawn
                 if (point->currentObject && point->currentObject->GetGUID() == guid)
+                {
                     point->currentObject = nullptr;
+                    point->currentItem = nullptr;
+                }
 
                 _poolCreatureDataMap.erase(obj->GetGUID());
             }
-
         }
+
+        // Clear creature pool info
+        creature->SetPoolData(nullptr, nullptr, nullptr);
     }
+
+    // @ToDo: GameObject stuffz
 }
 
 void MapPoolMgr::HandleDeath(Creature* obj)
@@ -786,7 +822,7 @@ void MapPoolMgr::HandleDeath(Creature* obj)
             MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
 
             // Check if current object is this one
-            if (point->currentObject->GetGUID() == obj->GetGUID())
+            if (point->currentObject && point->currentObject->GetGUID() == obj->GetGUID())
             {
 
                 // Add to old objects and unlink this spawnpoint
@@ -799,9 +835,75 @@ void MapPoolMgr::HandleDeath(Creature* obj)
                     point->oldObjects.push_back(obj);
 
                 point->currentObject = nullptr;
+                point->currentItem = nullptr;
+
+                MapPoolEntry* realPool = _getPool(pool->poolData.poolId);
+                realPool->AdjustSpawned(-1);
+
+                // Handle expedited spawns
+                uint32 spawnsNeeded = realPool->GetMinSpawnable();
+                if (spawnsNeeded > 0)
+                    if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
+                        ownerMap->RemoveRespawnTime(info, true);
             }
         }
+
     }
+}
+
+time_t MapPoolMgr::GenerateRespawnTime(WorldObject* obj)
+{
+    if (Creature* creature = obj->ToCreature())
+    {
+        MapPoolEntry const* pool = creature->GetPoolEntry();
+        MapPoolSpawnPoint const* spawnPoint = creature->GetPoolPoint();
+        MapPoolCreature const* cEntry = creature->GetPoolCreature();
+
+        // If we don't have all these things, it's not a valid pool creature
+        if (!pool || !spawnPoint || !cEntry)
+            return time_t(0);
+
+        // Check for specific override for this combination
+        if (MapPoolCreatureOverride* override = _getCreatureOverride(spawnPoint->pointId, creature->GetEntry()))
+        {
+            if (override->spawntimeSecsMin && override->spawntimeSecsMax)
+                return static_cast<time_t>(urand(override->spawntimeSecsMin, override->spawntimeSecsMax));
+        }
+
+        // Check for creature entry override next
+        if (cEntry->overrideData && cEntry->overrideData->spawntimeSecsMin && cEntry->overrideData->spawntimeSecsMax)
+            return static_cast<time_t>(urand(cEntry->overrideData->spawntimeSecsMin, cEntry->overrideData->spawntimeSecsMax));
+
+        // Next check for spawn point override
+        if (spawnPoint->creatureOverride && spawnPoint->creatureOverride->spawntimeSecsMin && spawnPoint->creatureOverride->spawntimeSecsMax)
+            return static_cast<time_t>(urand(spawnPoint->creatureOverride->spawntimeSecsMin, spawnPoint->creatureOverride->spawntimeSecsMax));
+
+        // Finally check pool
+        if (pool->poolData.spawntimeSecsMin && pool->poolData.spawntimeSecsMax)
+            return static_cast<time_t>(urand(pool->poolData.spawntimeSecsMin, pool->poolData.spawntimeSecsMax));
+    }
+
+    // If we make it here, we don't have anything
+    return time_t(0);
+}
+
+uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
+{
+    uint32 spawned = 0;
+    if (MapPoolEntry* pool = _getPool(poolId))
+    {
+        if (pool->parentPool)
+        {
+            for (uint32 item = 0; item < items; ++item)
+                spawned += pool->topPool->SpawnSingle() ? 1 : 0;
+        }
+        else
+        {
+            for (uint32 item = 0; item < items; ++item)
+                spawned += pool->SpawnSingle() ? 1 : 0;
+        }
+    }
+    return spawned;
 }
 
 CreatureData* MapPoolMgr::_getCreatureData(ObjectGuid guid)
@@ -849,10 +951,12 @@ Creature* MapPoolMgr::SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId)
         return nullptr;
     }
 
+    // Hold Creature data while pooled object is spawned
     _poolCreatureDataMap[newCreature->GetGUID()] = newData;
 
     // Register current creature to spawnpoint
     spawnPoint->currentObject = newCreature;
+    spawnPoint->currentItem = cEntry;
 
     // Register pool data into creature
     newCreature->SetPoolData(pool, spawnPoint, cEntry);
@@ -941,5 +1045,122 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPo
 
 bool MapPoolMgr::GenerateData(uint32 poolId, uint32 entry, uint32 pointId, GameObjectData* data)
 {
+    return false;
+}
+
+uint32 MapPoolEntry::GetMinSpawnable() const
+{
+    uint32 minSpawns = 0;
+    uint32 maxSpawns = 0;
+    uint32 minNeeded = 0;
+    uint32 maxAllowed = 0;
+    UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
+    return minNeeded;
+}
+
+uint32 MapPoolEntry::GetMaxSpawnable()
+{
+    uint32 minSpawns = 0;
+    uint32 maxSpawns = 0;
+    uint32 minNeeded = 0;
+    uint32 maxAllowed = 0;
+    UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
+    return maxAllowed;
+}
+
+void MapPoolEntry::AdjustSpawned(int adjust, bool onlyAggregate)
+{
+    if (!onlyAggregate)
+        spawnsThisPool += adjust;
+    spawnsAggregate += adjust;
+
+    if (parentPool)
+        parentPool->AdjustSpawned(adjust, true);
+}
+
+void MapPoolEntry::UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const
+{
+    if (minSpawns == 0 || this->poolData.minLimit > minSpawns)
+        minSpawns = this->poolData.minLimit;
+
+    if (maxSpawns == 0 || this->poolData.maxLimit < minSpawns)
+        maxSpawns = this->poolData.maxLimit;
+
+    int32 minNeededThisLevel = minSpawns - spawnsAggregate;
+    if (minNeededThisLevel > 0 && minNeededThisLevel > static_cast<int32>(minNeeded))
+        minNeeded = minNeededThisLevel;
+
+    int32 maxAllowedThisLevel = maxSpawns - spawnsAggregate;
+    if (maxAllowedThisLevel > 0 && (maxAllowedThisLevel < static_cast<int32>(maxAllowed) || maxAllowed == 0))
+        maxAllowed = maxAllowedThisLevel;
+
+    if (parentPool)
+        parentPool->UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
+}
+
+bool MapPoolEntry::SpawnSingle()
+{
+    if (childPools.size() == 0 && (spawnList.size() == 0 || itemList.size() == 0))
+    {
+        TC_LOG_ERROR("maps.pool", "[Map %u] No child pools OR items to spawn for pool %u", poolData.mapId, poolData.poolId);
+        return false;
+    }
+
+    if (childPools.size() !=0)
+    {
+        float chanceTotal = 0.0f;
+        for (MapPoolEntry* entry : childPools)
+            chanceTotal += std::max(entry->chance, 1.0f);
+
+        float choice = frand(1.0f, chanceTotal);
+        chanceTotal = 0.0f;
+
+        for (MapPoolEntry* entry : childPools)
+        {
+            chanceTotal += std::max(entry->chance, 1.0f);
+            if (chanceTotal >= choice)
+            {
+                return entry->SpawnSingle();
+            }
+        }
+    }
+    else
+    {
+        // Build spawnpoint shortlist
+        std::vector<MapPoolSpawnPoint*> freeList;
+        for (MapPoolSpawnPoint* point : spawnList)
+        {
+            if (!point->currentItem)
+                freeList.push_back(point);
+        }
+
+        if (freeList.size() == 0)
+            return false;
+
+        uint32 spawnChoice = urand(0, freeList.size() - 1);
+        MapPoolSpawnPoint* point = freeList[spawnChoice];
+
+        float chanceTotal = 0.0f;
+        for (MapPoolItem* item : itemList)
+            chanceTotal += std::max(item->chance, 1.0f);
+
+        float choice = frand(1.0f, chanceTotal);
+
+        chanceTotal = 0.0f;
+
+        for (MapPoolItem* item : itemList)
+        {
+            chanceTotal += std::max(item->chance, 1.0f);
+            if (chanceTotal >= choice)
+            {
+                WorldObject* obj;
+                if (item->ToCreatureItem())
+                    obj = ownerManager->SpawnCreature(poolData.poolId, item->entry, point->pointId);
+                else
+                    obj = ownerManager->SpawnGameObject(poolData.poolId, item->entry, point->pointId);
+                return obj != nullptr;
+            }
+        }
+    }
     return false;
 }
