@@ -107,7 +107,7 @@ bool Transport::Create(ObjectGuid::LowType guidlow, uint32 entry, uint32 mapid, 
     return true;
 }
 
-void Transport::CleanupsBeforeDelete(bool finalCleanup /*= true*/)
+void Transport::CleanupsBeforeDelete(bool finalCleanup /*= true*/, bool unloadingGrid)
 {
     UnloadStaticPassengers();
     while (!_passengers.empty())
@@ -116,7 +116,7 @@ void Transport::CleanupsBeforeDelete(bool finalCleanup /*= true*/)
         RemovePassenger(obj);
     }
 
-    GameObject::CleanupsBeforeDelete(finalCleanup);
+    GameObject::CleanupsBeforeDelete(finalCleanup, unloadingGrid);
 }
 
 void Transport::Update(uint32 diff)

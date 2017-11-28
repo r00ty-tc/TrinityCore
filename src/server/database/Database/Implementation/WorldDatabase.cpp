@@ -96,9 +96,9 @@ void WorldDatabaseConnection::DoPrepareStatements()
     PrepareStatement(WORLD_DEL_SPAWNGROUP_MEMBER, "DELETE FROM spawn_group WHERE spawnType = ? AND spawnId = ?", CONNECTION_ASYNC);
     PrepareStatement(WORLD_DEL_GAMEOBJECT_ADDON, "DELETE FROM gameobject_addon WHERE guid = ?", CONNECTION_ASYNC);
     PrepareStatement(WORLD_SEL_MAPPOOL_TEMPLATE, "SELECT poolId, poolType, phaseMask, spawnMask, minLimit, maxLimit, MovementType, spawnDist, spawntimeSecsMin, spawntimeSecsMax, spawntimeSecsFast, corpsetimeSecsLoot, corpsetimeSecsNoLoot, description FROM mappool_template WHERE map = ?", CONNECTION_SYNCH);
-    PrepareStatement(WORLD_SEL_MAPPOOL_HIERARCHY, "SELECT poolId, childPoolId FROM mappool_hierarchy WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_HIERARCHY, "SELECT poolId, childPoolId, chance FROM mappool_hierarchy WHERE map = ?", CONNECTION_SYNCH);
     PrepareStatement(WORLD_SEL_MAPPOOL_SPAWNPOINTS, "SELECT pointId, zoneId, areaId, gridId, positionX, positionY, positionZ, orientation, rotation0, rotation1, rotation2, rotation3 FROM mappool_spawnpoints WHERE map = ?", CONNECTION_SYNCH);
-    PrepareStatement(WORLD_SEL_MAPPOOL_SPAWNS, "SELECT poolId, pointId, chance FROM mappool_spawns WHERE map = ?", CONNECTION_SYNCH);
+    PrepareStatement(WORLD_SEL_MAPPOOL_SPAWNS, "SELECT poolId, pointId FROM mappool_spawns WHERE map = ?", CONNECTION_SYNCH);
     PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_INFO, "SELECT poolId, entry, chance, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags FROM mappool_creature WHERE map = ?", CONNECTION_SYNCH);
     PrepareStatement(WORLD_SEL_MAPPOOL_GAMEOBJECT_INFO, "SELECT poolId, entry, chance, animProgress, state FROM mappool_gameobject WHERE map = ?", CONNECTION_SYNCH);
     PrepareStatement(WORLD_SEL_MAPPOOL_CREATURE_OVERRIDE, "SELECT poolId, entry, pointId, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags, MovementType, spawnDist, phaseMask, spawnMask, spawntimeSecsMin, spawntimeSecsMax, corpsetimeSecsLoot, corpsetimeSecsNoLoot, path_id, mount, bytes1, bytes2, emote, auras, AIName, ScriptName FROM mappool_creature_override WHERE map = ?", CONNECTION_SYNCH);

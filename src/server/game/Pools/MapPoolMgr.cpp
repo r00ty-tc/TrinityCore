@@ -684,6 +684,18 @@ void MapPoolMgr::LoadMapPools()
     TC_LOG_INFO("server.loading", ">> [Map %u] Loaded %u pools", ownerMapId, pools);
 }
 
+void MapPoolMgr::SpawnMap()
+{
+    // Spawn map after initial load
+    for (auto itr = _poolMap.begin(); itr != _poolMap.end(); ++itr)
+    {
+        MapPoolEntry* pool = &itr->second;
+        // Only process top level pools
+        if (!pool->parentPool)
+            SpawnPool(pool->poolData.poolId);
+    }
+}
+
 MapPoolEntry* MapPoolMgr::_getPool(uint32 poolId)
 {
     auto pool = _poolMap.find(poolId);
@@ -775,7 +787,7 @@ GameObjectData const* MapPoolMgr::GetGameObjectData(ObjectGuid guid)
     return _getGameObjectData(guid);
 }
 
-void MapPoolMgr::HandleDespawn(WorldObject* obj)
+void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
 {
     if (Creature* creature = obj->ToCreature())
     {
@@ -783,6 +795,9 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj)
         {
             if (MapPoolSpawnPoint const* spawnPoint = creature->GetPoolPoint())
             {
+                if (!unloadingGrid && creature->IsAlive())
+                    HandleDeath(creature, unloadingGrid);
+
                 // Get real spawnpoint
                 MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
                 ObjectGuid const guid = obj->GetGUID();
@@ -796,10 +811,7 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj)
 
                 // In case of instant despawn
                 if (point->currentObject && point->currentObject->GetGUID() == guid)
-                {
                     point->currentObject = nullptr;
-                    point->currentItem = nullptr;
-                }
 
                 _poolCreatureDataMap.erase(obj->GetGUID());
             }
@@ -812,7 +824,7 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj)
     // @ToDo: GameObject stuffz
 }
 
-void MapPoolMgr::HandleDeath(Creature* obj)
+void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
 {
     if (MapPoolEntry const* pool = obj->GetPoolEntry())
     {
@@ -824,7 +836,6 @@ void MapPoolMgr::HandleDeath(Creature* obj)
             // Check if current object is this one
             if (point->currentObject && point->currentObject->GetGUID() == obj->GetGUID())
             {
-
                 // Add to old objects and unlink this spawnpoint
                 std::vector<WorldObject*>::const_iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [obj](std::vector<WorldObject*>::value_type const& item)
                 {
@@ -835,16 +846,23 @@ void MapPoolMgr::HandleDeath(Creature* obj)
                     point->oldObjects.push_back(obj);
 
                 point->currentObject = nullptr;
-                point->currentItem = nullptr;
+                if (!unloadingGrid)
+                    point->currentItem = nullptr;
 
                 MapPoolEntry* realPool = _getPool(pool->poolData.poolId);
                 realPool->AdjustSpawned(-1);
+
+                if (unloadingGrid)
+                    return;
 
                 // Handle expedited spawns
                 uint32 spawnsNeeded = realPool->GetMinSpawnable();
                 if (spawnsNeeded > 0)
                     if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
-                        ownerMap->RemoveRespawnTime(info, true);
+                    {
+                        if (SpawnPool(pool->poolData.poolId, 1))
+                            ownerMap->RemoveRespawnTime(info, false);
+                    }
             }
         }
 
@@ -892,6 +910,9 @@ uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
     uint32 spawned = 0;
     if (MapPoolEntry* pool = _getPool(poolId))
     {
+        if (items == 0)
+            items = pool->GetMaxSpawnable();
+
         if (pool->parentPool)
         {
             for (uint32 item = 0; item < items; ++item)
@@ -924,49 +945,52 @@ GameObjectData* MapPoolMgr::_getGameObjectData(ObjectGuid guid)
     return itr->second;
 }
 
-Creature* MapPoolMgr::SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId)
+bool MapPoolMgr::SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId)
 {
     MapPoolEntry* pool = _getPool(poolId);
     if (!pool)
-        return nullptr;
+        return false;
 
     MapPoolSpawnPoint* spawnPoint = _getSpawnPoint(pool, pointId);
     if (!spawnPoint)
-        return nullptr;
+        return false;
 
     MapPoolCreature* cEntry = _getSpawnCreature(pool, entry);
 
-    CreatureData* newData = new CreatureData();
-    if (!GenerateData(pool, cEntry, spawnPoint, newData))
+    GridCoord grid = Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY);
+    if (ownerMap->IsGridLoaded(grid.GetId()))
     {
-        delete newData;
-        return nullptr;
-    }
+        CreatureData* newData = new CreatureData();
+        if (!GenerateData(pool, cEntry, spawnPoint, newData))
+        {
+            delete newData;
+            return false;
+        }
 
-    Creature* newCreature = new Creature();
-    if (!newCreature->LoadFromDB(0, ownerMap, true, true, newData))
-    {
-        delete newCreature;
-        delete newData;
-        return nullptr;
+        Creature* newCreature = new Creature();
+        if (!newCreature->LoadFromDB(0, ownerMap, true, true, newData))
+        {
+            delete newCreature;
+            delete newData;
+            return false;
+        }
+        _poolCreatureDataMap[newCreature->GetGUID()] = newData;
+        spawnPoint->currentObject = newCreature;
+        newCreature->SetPoolData(pool, spawnPoint, cEntry);
     }
 
     // Hold Creature data while pooled object is spawned
-    _poolCreatureDataMap[newCreature->GetGUID()] = newData;
 
     // Register current creature to spawnpoint
-    spawnPoint->currentObject = newCreature;
     spawnPoint->currentItem = cEntry;
 
-    // Register pool data into creature
-    newCreature->SetPoolData(pool, spawnPoint, cEntry);
-
-    return newCreature;
+    pool->AdjustSpawned(1);
+    return true;
 }
 
-GameObject* MapPoolMgr::SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId)
+bool MapPoolMgr::SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId)
 {
-    return nullptr;
+    return false;
 }
 
 bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPoolSpawnPoint* point, CreatureData* data)
@@ -1153,14 +1177,46 @@ bool MapPoolEntry::SpawnSingle()
             chanceTotal += std::max(item->chance, 1.0f);
             if (chanceTotal >= choice)
             {
-                WorldObject* obj;
                 if (item->ToCreatureItem())
-                    obj = ownerManager->SpawnCreature(poolData.poolId, item->entry, point->pointId);
+                    return ownerManager->SpawnCreature(poolData.poolId, item->entry, point->pointId);
                 else
-                    obj = ownerManager->SpawnGameObject(poolData.poolId, item->entry, point->pointId);
-                return obj != nullptr;
+                    return ownerManager->SpawnGameObject(poolData.poolId, item->entry, point->pointId);
             }
         }
     }
+    return false;
+}
+
+bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
+{
+    if (!spawnPoint || !spawnPoint->currentItem)
+        return false;
+
+    if (MapPoolEntry* pool = _getPool(spawnPoint->currentItem->poolId))
+    {
+        if (MapPoolCreature* cEntry = spawnPoint->currentItem->ToCreatureItem())
+        {
+            CreatureData* newData = new CreatureData();
+            if (!GenerateData(pool, cEntry, spawnPoint, newData))
+            {
+                delete newData;
+                return false;
+            }
+
+            Creature* newCreature = new Creature();
+            if (!newCreature->LoadFromDB(0, ownerMap, true, true, newData))
+            {
+                delete newCreature;
+                delete newData;
+                return false;
+            }
+            _poolCreatureDataMap[newCreature->GetGUID()] = newData;
+            spawnPoint->currentObject = newCreature;
+            newCreature->SetPoolData(pool, spawnPoint, cEntry);
+            return true;
+        }
+        // @ToDo: More gameobject magic needed
+    }
+
     return false;
 }

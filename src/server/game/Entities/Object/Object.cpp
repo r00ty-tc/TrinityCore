@@ -1042,7 +1042,7 @@ void WorldObject::SetVisibilityDistanceOverride(VisibilityDistanceType type)
     m_visibilityDistanceOverride = VisibilityDistances[AsUnderlyingType(type)];
 }
 
-void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/)
+void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/, bool unloadingGrid)
 {
     if (IsInWorld())
         RemoveFromWorld();

@@ -172,9 +172,9 @@ std::string const& GameObject::GetAIName() const
     return sObjectMgr->GetGameObjectTemplate(GetEntry())->AIName;
 }
 
-void GameObject::CleanupsBeforeDelete(bool finalCleanup)
+void GameObject::CleanupsBeforeDelete(bool finalCleanup, bool unloadingGrid)
 {
-    WorldObject::CleanupsBeforeDelete(finalCleanup);
+    WorldObject::CleanupsBeforeDelete(finalCleanup, unloadingGrid);
 
     if (m_uint32Values)                                      // field array can be not exist if GameOBject not loaded
         RemoveFromOwner();

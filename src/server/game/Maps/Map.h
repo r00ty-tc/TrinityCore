@@ -340,6 +340,10 @@ inline bool CompareRespawnInfo::operator()(RespawnInfo const* a, RespawnInfo con
         return (a->respawnTime > b->respawnTime);
     if (a->spawnId != b->spawnId)
         return a->spawnId < b->spawnId;
+    if (a->poolId != b->poolId)
+        return a->poolId < b->poolId;
+    if (a->lastPoolPointId != b->lastPoolPointId)
+        return a->lastPoolPointId < b->lastPoolPointId;
     ASSERT(a->type != b->type, "Duplicate respawn entry for spawnId (%u,%u) found!", a->type, a->spawnId);
     return a->type < b->type;
 }
@@ -557,6 +561,17 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
             return nullptr;
         }
+
+        std::vector<MapPoolSpawnPoint*> const* GetSpawnPointsInGrid(uint32 gridId) const
+        {
+            auto itr = _spawnPointsByGrid.find(gridId);
+            if (itr != _spawnPointsByGrid.end())
+                return &itr->second;
+
+            return nullptr;
+        }
+
+        void ProcessSpawnPointsForGrid(uint32 gridId) const;
 
         Corpse* GetCorpseByPlayer(ObjectGuid const& ownerGuid) const
         {
@@ -922,6 +937,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         CreatureBySpawnIdContainer _creatureBySpawnIdStore;
         GameObjectBySpawnIdContainer _gameobjectBySpawnIdStore;
         std::unordered_map<uint32/*cellId*/, std::unordered_set<Corpse*>> _corpsesByCell;
+        std::unordered_map<uint32/*gridId*/, std::vector<MapPoolSpawnPoint*>> _spawnPointsByGrid;
         std::unordered_map<ObjectGuid, Corpse*> _corpsesByPlayer;
         std::unordered_set<Corpse*> _corpseBones;
 

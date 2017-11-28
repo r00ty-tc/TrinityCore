@@ -9510,11 +9510,11 @@ void Unit::CleanupBeforeRemoveFromMap(bool finalCleanup)
     ClearComboPointHolders();
 }
 
-void Unit::CleanupsBeforeDelete(bool finalCleanup)
+void Unit::CleanupsBeforeDelete(bool finalCleanup, bool unloadingGrid)
 {
     CleanupBeforeRemoveFromMap(finalCleanup);
 
-    WorldObject::CleanupsBeforeDelete(finalCleanup);
+    WorldObject::CleanupsBeforeDelete(finalCleanup, unloadingGrid);
 }
 
 void Unit::UpdateCharmAI()

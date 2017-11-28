@@ -443,12 +443,12 @@ Player::~Player()
     sWorld->DecreasePlayerCount();
 }
 
-void Player::CleanupsBeforeDelete(bool finalCleanup)
+void Player::CleanupsBeforeDelete(bool finalCleanup, bool unloadingGrid)
 {
     TradeCancel(false);
     DuelComplete(DUEL_INTERRUPTED);
 
-    Unit::CleanupsBeforeDelete(finalCleanup);
+    Unit::CleanupsBeforeDelete(finalCleanup, unloadingGrid);
 
     // clean up player-instance binds, may unload some instance saves
     for (uint8 i = 0; i < MAX_DIFFICULTY; ++i)

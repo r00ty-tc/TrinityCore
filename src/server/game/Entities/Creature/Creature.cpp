@@ -2384,7 +2384,7 @@ bool Creature::_IsTargetAcceptable(Unit const* target) const
 
 void Creature::SaveRespawnTime(uint32 forceDelay, bool savetodb)
 {
-    if (IsSummon() || !m_spawnId || (m_creatureData && !m_creatureData->dbData))
+    if (IsSummon() || (!m_spawnId && !m_poolEntry) || (m_creatureData && !m_creatureData->dbData))
         return;
 
     uint32 poolId = m_poolEntry ? m_poolEntry->poolData.poolId : 0;
@@ -2398,7 +2398,7 @@ void Creature::SaveRespawnTime(uint32 forceDelay, bool savetodb)
 
     time_t thisRespawnTime = time_t(0);
     if (poolId != 0)
-        thisRespawnTime = GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
+        thisRespawnTime = forceDelay ? time(nullptr) + forceDelay : time(nullptr) + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
     else
         thisRespawnTime = thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
     GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, GetMap()->GetZoneId(GetHomePosition()), poolId, pointId, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), savetodb && m_creatureData && m_creatureData->dbData);

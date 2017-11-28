@@ -292,6 +292,7 @@ i_scriptLock(false), _respawnCheckTimer(0), _defaultLight(GetDefaultMapLight(id)
     LoadSpawnPoints();
     sMapPoolMgr = new MapPoolMgr(this);
     sMapPoolMgr->LoadMapPools();
+    sMapPoolMgr->SpawnMap();
 }
 
 void Map::InitVisibilityDistance()
@@ -536,6 +537,7 @@ bool Map::EnsureGridLoaded(Cell const& cell)
 
         ObjectGridLoader loader(*grid, this, cell);
         loader.LoadN();
+        ProcessSpawnPointsForGrid(GridCoord(cell.GridX(), cell.GridY()).GetId());
 
         Balance();
         return true;
@@ -543,6 +545,16 @@ bool Map::EnsureGridLoaded(Cell const& cell)
 
     return false;
 }
+
+void Map::ProcessSpawnPointsForGrid(uint32 gridId) const
+{
+    if (std::vector<MapPoolSpawnPoint*> const* spawnPoints = GetSpawnPointsInGrid(gridId))
+    {
+        for (MapPoolSpawnPoint* spawnPoint : *spawnPoints)
+            GetMapPoolMgr()->SpawnPendingPoint(spawnPoint);
+    }
+}
+
 
 void Map::GridMarkNoUnload(uint32 x, uint32 y)
 {
@@ -3078,7 +3090,7 @@ void Map::Respawn(std::vector<RespawnInfo*>& respawnData, bool force, SQLTransac
 
 void Map::AddRespawnInfo(RespawnInfo& info, bool replace)
 {
-    if (!info.spawnId)
+    if (!info.spawnId & !info.poolId)
         return;
 
     if (!info.poolId)
@@ -3155,6 +3167,7 @@ void Map::DeleteRespawnInfo() // delete everything
     _respawnTimes.clear();
     _creatureRespawnTimesBySpawnId.clear();
     _gameObjectRespawnTimesBySpawnId.clear();
+    _RespawnTimesByPoolId.clear();
 }
 
 void Map::DeleteRespawnInfo(RespawnInfo* info)
@@ -3163,8 +3176,23 @@ void Map::DeleteRespawnInfo(RespawnInfo* info)
     ASSERT(info);
 
     // spawnid store
-    size_t const n = GetRespawnMapForType(info->type).erase(info->spawnId);
-    ASSERT(n == 1, "Respawn stores inconsistent for map %u, spawnid %u (type %u)", GetId(), info->spawnId, uint32(info->type));
+    if (!info->poolId)
+    {
+        size_t const n = GetRespawnMapForType(info->type).erase(info->spawnId);
+        ASSERT(n == 1, "Respawn stores inconsistent for map %u, spawnid %u (type %u)", GetId(), info->spawnId, uint32(info->type));
+    }
+    else
+    {
+        auto bounds = _RespawnTimesByPoolId.equal_range(info->poolId);
+        for (auto itr = bounds.first; itr != bounds.second; ++itr)
+        {
+            if (itr->second == info)
+            {
+                _RespawnTimesByPoolId.erase(itr);
+                break;
+            }
+        }
+    }
 
     //respawn heap
     _respawnTimes.erase(info->handle);
@@ -3179,19 +3207,29 @@ void Map::RemoveRespawnTime(RespawnInfo* info, bool doRespawn, SQLTransaction db
     switch (info->type)
     {
         case SPAWN_TYPE_CREATURE:
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN);
+            if (info->poolId)
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN_BYPOOL);
+            else
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN);
             break;
         case SPAWN_TYPE_GAMEOBJECT:
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
+            if (info->poolId)
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN_BYPOOL);
+            else
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN);
             break;
         default:
             ASSERT(false, "Invalid respawninfo type %u for spawnid %u map %u", uint32(info->type), info->spawnId, GetId());
             return;
     }
-    stmt->setUInt32(0, info->spawnId);
-    stmt->setUInt16(1, GetId());
-    stmt->setUInt32(2, GetInstanceId());
-    CharacterDatabase.ExecuteOrAppend(dbTrans, stmt);
+
+    if (!info->poolId)
+    {
+        stmt->setUInt32(0, info->spawnId);
+        stmt->setUInt16(1, GetId());
+        stmt->setUInt32(2, GetInstanceId());
+        CharacterDatabase.ExecuteOrAppend(dbTrans, stmt);
+    }
 
     if (doRespawn)
         Respawn(info);
@@ -4511,6 +4549,10 @@ void Map::LoadSpawnPoints()
 
             // Add this spawn
             m_spawnPoints[thisSpawn->pointId] = thisSpawn;
+
+            // Add to cell list
+            GridCoord grid = Trinity::ComputeGridCoord(thisSpawn->positionX, thisSpawn->positionY);
+            _spawnPointsByGrid[grid.GetId()].push_back(thisSpawn);
             ++spawnPoints;
         } while (result->NextRow());
 

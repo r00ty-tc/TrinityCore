@@ -87,7 +87,7 @@ class TC_GAME_API GameObject : public WorldObject, public GridObject<GameObject>
 
         void AddToWorld() override;
         void RemoveFromWorld() override;
-        void CleanupsBeforeDelete(bool finalCleanup = true) override;
+        void CleanupsBeforeDelete(bool finalCleanup = true, bool unloadingGrid = false) override;
 
         bool Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* map, uint32 phaseMask, Position const& pos, QuaternionData const& rotation, uint32 animprogress, GOState go_state, uint32 artKit = 0, bool dynamic = false, ObjectGuid::LowType spawnid = 0);
         void Update(uint32 p_time) override;

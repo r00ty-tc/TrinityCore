@@ -30,8 +30,8 @@ struct MapPoolCreature;
 struct MapPoolGameObjectOverride;
 struct MapPoolGameObject;
 struct MapPoolSpawn;
-class GameObjectData;
-class CreatureData;
+struct GameObjectData;
+struct CreatureData;
 
 enum PoolType
 {
@@ -169,6 +169,10 @@ public:
         type = POOLTYPE_CREATURE;
         topPool = nullptr;
         parentPool = nullptr;
+        ownerManager = nullptr;
+        spawnsThisPool = 0;
+        spawnsAggregate = 0;
+        chance = 0.0f;
     }
 
     // Checks if poolId is anywhere in the hierarchy already
@@ -194,6 +198,8 @@ private:
     std::unordered_map<PointEntryPair, MapPoolGameObjectOverride*> _poolGameObjectOverrideMap;
     std::unordered_map<ObjectGuid, CreatureData*> _poolCreatureDataMap;
     std::unordered_map<ObjectGuid ,GameObjectData*> _poolGameObjectDataMap;
+
+protected:
     MapPoolEntry* _getPool(uint32 poolId);
     static MapPoolSpawnPoint* _getSpawnPoint(MapPoolEntry const* pool, uint32 pointId);
     static MapPoolCreature* _getSpawnCreature(MapPoolEntry const* pool, uint32 entry);
@@ -202,27 +208,29 @@ private:
     MapPoolGameObjectOverride* _getGameObjectOverride(uint32 pointId, uint32 entry);
     CreatureData* _getCreatureData(ObjectGuid guid);
     GameObjectData* _getGameObjectData(ObjectGuid guid);
-    Creature* SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId);
-    GameObject* SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
     bool GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPoolSpawnPoint* point, CreatureData* data);
     bool GenerateData(uint32 poolId, uint32 entry, uint32 pointId, GameObjectData* data);
+    bool SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId);
+    bool SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
 
 public:
     MapPoolMgr(Map* map);
     ~MapPoolMgr();
     void LoadMapPools();
+    void SpawnMap();
     MapPoolEntry const* GetPool(uint32 poolId);
     MapPoolCreatureOverride const* GetCreatureOverride(uint32 pointId, uint32 entry);
     MapPoolGameObjectOverride const* GetGameObjectOverride(uint32 pointId, uint32 entry);
     CreatureData const* GetCreatureData(ObjectGuid guid);
     GameObjectData const* GetGameObjectData(ObjectGuid guid);
-    bool SpawnCreatureManual(uint32 poolId, uint32 entry, uint32 pointId) { return (SpawnCreature(poolId, entry ,pointId) != nullptr); }
-    void HandleDespawn(WorldObject* obj);
-    void HandleDeath(Creature* obj);
+    bool SpawnCreatureManual(uint32 poolId, uint32 entry, uint32 pointId) { return (SpawnCreature(poolId, entry ,pointId)); }
+    void HandleDespawn(WorldObject* obj, bool unloadingGrid = false);
+    void HandleDeath(Creature* obj, bool unloadingGrid = false);
     static MapPoolCreature const* GetSpawnCreature(MapPoolEntry const* pool, uint32 entry) { return _getSpawnCreature(pool, entry); }
     static MapPoolGameObject const* GetSpawnGameObject(MapPoolEntry* pool, uint32 entry) { return _getSpawnGameObject(pool, entry); }
     time_t GenerateRespawnTime(WorldObject* obj);
     uint32 SpawnPool(uint32 poolId, uint32 items = 0);
+    bool SpawnPendingPoint(MapPoolSpawnPoint* pointId);
 };
 
 #endif
