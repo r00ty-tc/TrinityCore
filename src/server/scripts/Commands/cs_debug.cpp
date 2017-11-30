@@ -125,17 +125,6 @@ public:
         return commandTable;
     }
 
-    static bool HandleDebugPoolSpawn(ChatHandler* handler, char const* args)
-    {
-         // For now, just testing
-        if (Player* player = handler->GetSession()->GetPlayer())
-        {
-            player->GetMap()->GetMapPoolMgr()->SpawnCreatureManual(10, 1501, 11);
-            player->GetMap()->GetMapPoolMgr()->SpawnCreatureManual(10, 1502, 12);
-        }
-        return true;
-    }
-
     static bool HandleDebugPlayCinematicCommand(ChatHandler* handler, char const* args)
     {
         // USAGE: .debug play cinematic #cinematicId

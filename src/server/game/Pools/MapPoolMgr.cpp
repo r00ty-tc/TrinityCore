@@ -20,7 +20,6 @@
 #include "MapPoolMgr.h"
 #include "Log.h"
 #include "ObjectMgr.h"
-#include <combaseapi.h>
 #include <boost/container/flat_set.hpp>
 #include <Creature.h>
 #include "CreatureData.h"
@@ -801,7 +800,7 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
                 // Get real spawnpoint
                 MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
                 ObjectGuid const guid = obj->GetGUID();
-                std::vector<WorldObject*>::const_iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [guid](std::vector<WorldObject*>::value_type const& item)
+                std::vector<WorldObject*>::iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [guid](std::vector<WorldObject*>::value_type const& item)
                 {
                     return (item->GetGUID() == guid);
                 });
@@ -911,7 +910,14 @@ uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
     if (MapPoolEntry* pool = _getPool(poolId))
     {
         if (items == 0)
+        {
             items = pool->GetMaxSpawnable();
+
+            // Check for pending respawns
+            std::vector<RespawnInfo*> ri;
+            if (ownerMap->GetPoolRespawnInfo(poolId, ri))
+               items -= ri.size();
+        }
 
         if (pool->parentPool)
         {
@@ -988,7 +994,7 @@ bool MapPoolMgr::SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId)
     return true;
 }
 
-bool MapPoolMgr::SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId)
+bool MapPoolMgr::SpawnGameObject(uint32 /*poolId*/, uint32 /*entry*/, uint32 /*pointId*/)
 {
     return false;
 }
@@ -1067,7 +1073,7 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPo
     return false;
 }
 
-bool MapPoolMgr::GenerateData(uint32 poolId, uint32 entry, uint32 pointId, GameObjectData* data)
+bool MapPoolMgr::GenerateData(uint32 /*poolId*/, uint32 /*entry*/, uint32 /*pointId*/, GameObjectData* /*data*/)
 {
     return false;
 }
@@ -1082,7 +1088,7 @@ uint32 MapPoolEntry::GetMinSpawnable() const
     return minNeeded;
 }
 
-uint32 MapPoolEntry::GetMaxSpawnable()
+uint32 MapPoolEntry::GetMaxSpawnable() const
 {
     uint32 minSpawns = 0;
     uint32 maxSpawns = 0;
@@ -1094,9 +1100,11 @@ uint32 MapPoolEntry::GetMaxSpawnable()
 
 void MapPoolEntry::AdjustSpawned(int adjust, bool onlyAggregate)
 {
-    if (!onlyAggregate)
+    if (!onlyAggregate && int32(spawnsThisPool + adjust) >= 0)
         spawnsThisPool += adjust;
-    spawnsAggregate += adjust;
+
+    if (int32(spawnsAggregate + adjust) >= 0)
+        spawnsAggregate += adjust;
 
     if (parentPool)
         parentPool->AdjustSpawned(adjust, true);
@@ -1219,4 +1227,19 @@ bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
     }
 
     return false;
+}
+
+uint32 MapPoolMgr::GetRespawnCounter(uint32 poolId)
+{
+    if (MapPoolEntry* pool = _getPool(poolId))
+        return pool->GetRespawnCounter();
+
+    return 0;
+}
+
+void MapPoolMgr::RegisterRespawn(uint32 poolId)
+{
+    // Register a respawn (subtract available spawns
+    if (MapPoolEntry* pool = _getPool(poolId))
+        pool->AdjustSpawned(1);
 }

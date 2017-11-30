@@ -1051,7 +1051,7 @@ void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/, bool unloadingGrid
         transport->RemovePassenger(this);
 
     if (Creature* creature = ToCreature())
-        GetMap()->GetMapPoolMgr()->HandleDespawn(this);
+        GetMap()->GetMapPoolMgr()->HandleDespawn(this, unloadingGrid);
 }
 
 void WorldObject::_Create(ObjectGuid::LowType guidlow, HighGuid guidhigh, uint32 phaseMask)

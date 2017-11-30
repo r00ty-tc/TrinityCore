@@ -31,7 +31,6 @@ class DynamicObject;
 class GameObject;
 class Pet;
 class Player;
-struct MapPoolSpawnPoint;
 
 #define MAX_NUMBER_OF_CELLS     8
 
@@ -62,11 +61,11 @@ typedef TYPELIST_4(Player, Creature/*pets*/, Corpse/*resurrectable*/, DynamicObj
 typedef TYPELIST_4(GameObject, Creature/*except pets*/, DynamicObject, Corpse/*Bones*/) AllGridObjectTypes;
 typedef TYPELIST_5(Creature, GameObject, DynamicObject, Pet, Corpse) AllMapStoredObjectTypes;
 
-typedef GridRefManager<Corpse>              CorpseMapType;
-typedef GridRefManager<Creature>            CreatureMapType;
-typedef GridRefManager<DynamicObject>       DynamicObjectMapType;
-typedef GridRefManager<GameObject>          GameObjectMapType;
-typedef GridRefManager<Player>              PlayerMapType;
+typedef GridRefManager<Corpse>          CorpseMapType;
+typedef GridRefManager<Creature>        CreatureMapType;
+typedef GridRefManager<DynamicObject>   DynamicObjectMapType;
+typedef GridRefManager<GameObject>      GameObjectMapType;
+typedef GridRefManager<Player>          PlayerMapType;
 
 enum GridMapTypeMask
 {

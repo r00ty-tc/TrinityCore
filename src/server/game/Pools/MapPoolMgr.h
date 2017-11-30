@@ -159,6 +159,7 @@ public:
     MapPoolEntry* topPool;
     uint32 spawnsThisPool;
     uint32 spawnsAggregate;
+    uint32 respawnCounter;
     float chance;
     std::vector<MapPoolEntry*> childPools;
     std::vector<MapPoolSpawnPoint*> spawnList;
@@ -173,17 +174,19 @@ public:
         spawnsThisPool = 0;
         spawnsAggregate = 0;
         chance = 0.0f;
+        respawnCounter = 1;
     }
 
     // Checks if poolId is anywhere in the hierarchy already
     bool CheckHierarchy(uint32 poolId, bool callingSelf = false) const;
 
     MapPoolEntry* GetTopPool() const { return parentPool == nullptr ? const_cast<MapPoolEntry*>(this) : parentPool->GetTopPool(); }
-    uint32 GetMaxSpawnable();
+    uint32 GetMaxSpawnable() const;
     uint32 GetMinSpawnable() const;
     void AdjustSpawned(int adjust, bool onlyAggregate = false);
     bool SpawnSingle();
     void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }
+    uint32 GetRespawnCounter() { return respawnCounter++; }
 };
 
 class TC_GAME_API MapPoolMgr
@@ -231,6 +234,8 @@ public:
     time_t GenerateRespawnTime(WorldObject* obj);
     uint32 SpawnPool(uint32 poolId, uint32 items = 0);
     bool SpawnPendingPoint(MapPoolSpawnPoint* pointId);
+    uint32 GetRespawnCounter(uint32 poolId);
+    void RegisterRespawn(uint32 poolId);
 };
 
 #endif

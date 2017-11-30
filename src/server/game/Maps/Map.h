@@ -843,6 +843,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
                 Respawn(info, true);
         }
         std::vector<RespawnInfo*> GetPoolRespawnInfo(uint32 poolId);
+        bool GetPoolRespawnInfo(uint32 poolId, std::vector<RespawnInfo*>& ri);
         RespawnInfo* GetFirstPoolRespawn(uint32 poolId);
         void RemoveRespawnTime(RespawnInfo* info, bool doRespawn = false, SQLTransaction dbTrans = nullptr);
         void RemoveRespawnTime(std::vector<RespawnInfo*>& respawnData, bool doRespawn = false, SQLTransaction dbTrans = nullptr);
@@ -858,6 +859,8 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
             if (RespawnInfo* info = GetRespawnInfo(type, spawnId))
                 RemoveRespawnTime(info, doRespawn, dbTrans);
         }
+
+        void RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, SQLTransaction dbTrans = nullptr) const;
 
         SpawnGroupTemplateData const* GetSpawnGroupData(uint32 groupId) const;
 

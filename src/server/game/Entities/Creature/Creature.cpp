@@ -2398,10 +2398,16 @@ void Creature::SaveRespawnTime(uint32 forceDelay, bool savetodb)
 
     time_t thisRespawnTime = time_t(0);
     if (poolId != 0)
+    {
+        // For pools, we use pool counter instead of spawnId
         thisRespawnTime = forceDelay ? time(nullptr) + forceDelay : time(nullptr) + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
+        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), 0, thisRespawnTime, GetMap()->GetZoneId(GetHomePosition()), poolId, pointId, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), savetodb && m_creatureData && m_creatureData->dbData);
+    }
     else
+    {
         thisRespawnTime = thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
-    GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, GetMap()->GetZoneId(GetHomePosition()), poolId, pointId, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), savetodb && m_creatureData && m_creatureData->dbData);
+        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, GetMap()->GetZoneId(GetHomePosition()), poolId, pointId, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), savetodb && m_creatureData && m_creatureData->dbData);
+    }
 }
 
 // this should not be called by petAI or

@@ -35,6 +35,7 @@
 #include "Player.h"
 #include "WorldSession.h"
 #include "Opcodes.h"
+#include "MapPoolMgr.h"
 
 MapManager::MapManager()
     : _nextInstanceId(0), _scheduledScripts(0)
@@ -85,6 +86,8 @@ Map* MapManager::CreateBaseMap(uint32 id)
             map = new Map(id, i_gridCleanUpDelay, 0, REGULAR_DIFFICULTY);
             map->LoadRespawnTimes();
             map->LoadCorpseData();
+            // Must be done after respawn times loaded
+            map->GetMapPoolMgr()->SpawnMap();
         }
 
         i_maps[id] = map;
