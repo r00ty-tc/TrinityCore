@@ -919,15 +919,19 @@ uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
                items -= ri.size();
         }
 
-        if (pool->parentPool)
+        // Always spawn from top level pool
+        MapPoolEntry* workPool = pool->parentPool ? pool->topPool : pool;
+
+        bool minReached = false;
+        for (uint32 item = 0; item < items; ++item)
         {
-            for (uint32 item = 0; item < items; ++item)
-                spawned += pool->topPool->SpawnSingle() ? 1 : 0;
-        }
-        else
-        {
-            for (uint32 item = 0; item < items; ++item)
-                spawned += pool->SpawnSingle() ? 1 : 0;
+            if (!minReached && workPool->SpawnSingleToMinimum())
+                ++spawned;
+            else
+                minReached = true;
+
+            if (minReached)
+                spawned += workPool->SpawnSingle() ? 1 : 0;
         }
     }
     return spawned;
@@ -1158,38 +1162,64 @@ bool MapPoolEntry::SpawnSingle()
     }
     else
     {
-        // Build spawnpoint shortlist
-        std::vector<MapPoolSpawnPoint*> freeList;
-        for (MapPoolSpawnPoint* point : spawnList)
+        return PerformSpawn();
+    }
+    return false;
+}
+
+bool MapPoolEntry::SpawnSingleToMinimum()
+{
+    if (!GetMinSpawnable())
+        return false;
+
+    if (spawnList.size() > 0 && PerformSpawn())
+        return true;
+
+    if (!childPools.size())
+        return false;
+
+    for (MapPoolEntry* childPool : childPools)
+    {
+        if (childPool->SpawnSingleToMinimum())
+            return true;
+    }
+
+    return false;
+}
+
+bool MapPoolEntry::PerformSpawn()
+{
+    // Build spawnpoint shortlist
+    std::vector<MapPoolSpawnPoint*> freeList;
+    for (MapPoolSpawnPoint* point : spawnList)
+    {
+        if (!point->currentItem)
+            freeList.push_back(point);
+    }
+
+    if (freeList.size() == 0)
+        return false;
+
+    uint32 spawnChoice = urand(0, freeList.size() - 1);
+    MapPoolSpawnPoint* point = freeList[spawnChoice];
+
+    float chanceTotal = 0.0f;
+    for (MapPoolItem* item : itemList)
+        chanceTotal += std::max(item->chance, 1.0f);
+
+    float choice = frand(1.0f, chanceTotal);
+
+    chanceTotal = 0.0f;
+
+    for (MapPoolItem* item : itemList)
+    {
+        chanceTotal += std::max(item->chance, 1.0f);
+        if (chanceTotal >= choice)
         {
-            if (!point->currentItem)
-                freeList.push_back(point);
-        }
-
-        if (freeList.size() == 0)
-            return false;
-
-        uint32 spawnChoice = urand(0, freeList.size() - 1);
-        MapPoolSpawnPoint* point = freeList[spawnChoice];
-
-        float chanceTotal = 0.0f;
-        for (MapPoolItem* item : itemList)
-            chanceTotal += std::max(item->chance, 1.0f);
-
-        float choice = frand(1.0f, chanceTotal);
-
-        chanceTotal = 0.0f;
-
-        for (MapPoolItem* item : itemList)
-        {
-            chanceTotal += std::max(item->chance, 1.0f);
-            if (chanceTotal >= choice)
-            {
-                if (item->ToCreatureItem())
-                    return ownerManager->SpawnCreature(poolData.poolId, item->entry, point->pointId);
-                else
-                    return ownerManager->SpawnGameObject(poolData.poolId, item->entry, point->pointId);
-            }
+            if (item->ToCreatureItem())
+                return ownerManager->SpawnCreature(poolData.poolId, item->entry, point->pointId);
+            else
+                return ownerManager->SpawnGameObject(poolData.poolId, item->entry, point->pointId);
         }
     }
     return false;

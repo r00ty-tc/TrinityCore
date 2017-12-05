@@ -151,6 +151,7 @@ class MapPoolEntry
 private:
     MapPoolMgr* ownerManager;
     void UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const;
+    bool PerformSpawn();
 
 public:
     MapPoolTemplate poolData;
@@ -185,6 +186,7 @@ public:
     uint32 GetMinSpawnable() const;
     void AdjustSpawned(int adjust, bool onlyAggregate = false);
     bool SpawnSingle();
+    bool SpawnSingleToMinimum();
     void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }
     uint32 GetRespawnCounter() { return respawnCounter++; }
 };
