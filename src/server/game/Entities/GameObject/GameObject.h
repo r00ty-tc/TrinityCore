@@ -25,6 +25,7 @@
 #include "Loot.h"
 #include "MapObject.h"
 #include "SharedDefines.h"
+#include "MapPoolMgr.h"
 
 class GameObjectAI;
 class GameObjectModel;
@@ -32,6 +33,9 @@ class Group;
 class OPvPCapturePoint;
 class Transport;
 class Unit;
+class MapPoolEntry;
+struct MapPoolSpawnPoint;
+struct MapPoolCreature;
 struct TransportAnimation;
 enum TriggerCastFlags : uint32;
 
@@ -117,7 +121,7 @@ class TC_GAME_API GameObject : public WorldObject, public GridObject<GameObject>
 
         void SaveToDB();
         void SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask);
-        bool LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool = true); // arg4 is unused, only present to match the signature on Creature
+        bool LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool = true, GameObjectData* goData = nullptr); // arg4 is unused, only present to match the signature on Creature
         void DeleteFromDB();
 
         void SetOwnerGUID(ObjectGuid owner)
@@ -297,6 +301,15 @@ class TC_GAME_API GameObject : public WorldObject, public GridObject<GameObject>
 
         std::string GetDebugInfo() const override;
 
+        void SetPoolData(MapPoolEntry* pool, MapPoolSpawnPoint* spawnPoint, MapPoolGameObject* goEntry)
+        {
+            m_poolEntry = pool;
+            m_poolPoint = spawnPoint;
+            m_poolGameObject = goEntry;
+        }
+        MapPoolEntry const* GetPoolEntry() const { return m_poolEntry; }
+        MapPoolSpawnPoint const* GetPoolPoint() const { return m_poolPoint; }
+        MapPoolGameObject const* GetPoolGameObject() const { return m_poolGameObject; }
     protected:
         GameObjectModel* CreateModel();
         void UpdateModel();                                 // updates model in case displayId were changed
@@ -337,7 +350,9 @@ class TC_GAME_API GameObject : public WorldObject, public GridObject<GameObject>
         uint32 m_lootGenerationTime;
 
         ObjectGuid m_linkedTrap;
-
+        MapPoolEntry* m_poolEntry;
+        MapPoolSpawnPoint* m_poolPoint;
+        MapPoolGameObject* m_poolGameObject;
     private:
         void RemoveFromOwner();
         void SwitchDoorOrButton(bool activate, bool alternative = false);

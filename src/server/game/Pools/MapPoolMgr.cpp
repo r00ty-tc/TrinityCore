@@ -333,6 +333,7 @@ void MapPoolMgr::LoadMapPools()
                 thisInfo->npcFlag = fields[8].GetUInt32();
                 thisInfo->unitFlags = fields[9].GetUInt32();
                 thisInfo->dynamicFlags = fields[10].GetUInt32();
+                thisInfo->overrideData = nullptr;
 
                 // Add this creature
                 thisPool->itemList.push_back(thisInfo);
@@ -407,6 +408,7 @@ void MapPoolMgr::LoadMapPools()
                 thisInfo->chance = fields[2].GetFloat();
                 thisInfo->animProgress = fields[3].GetUInt8();
                 thisInfo->state = fields[4].GetUInt8();
+                thisInfo->overrideData = nullptr;
 
                 // Add this creature
                 thisPool->itemList.push_back(thisInfo);
@@ -737,7 +739,7 @@ MapPoolGameObject* MapPoolMgr::_getSpawnGameObject(MapPoolEntry* pool, uint32 en
         return (item->entry == entry);
     });
 
-    if (entryItr == pool->itemList.end() || (*entryItr)->type != POOLTYPE_CREATURE)
+    if (entryItr == pool->itemList.end() || (*entryItr)->type != POOLTYPE_GAMEOBJECT)
         return nullptr;
 
     return (*entryItr)->ToGameObjectItem();
@@ -819,8 +821,43 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
         // Clear creature pool info
         creature->SetPoolData(nullptr, nullptr, nullptr);
     }
+    else if (GameObject* gameObject = obj->ToGameObject())
+    {
+        if (MapPoolEntry const* pool = gameObject->GetPoolEntry())
+        {
+            if (MapPoolSpawnPoint const* spawnPoint = gameObject->GetPoolPoint())
+            {
+                // Get real spawnpoint
+                MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
+                ObjectGuid const guid = obj->GetGUID();
 
-    // @ToDo: GameObject stuffz
+                if (point->currentObject && point->currentObject->GetGUID() == guid)
+                    point->currentObject = nullptr;
+
+                MapPoolEntry* realPool = _getPool(pool->poolData.poolId);
+                realPool->AdjustSpawned(-1);
+
+                _poolGameObjectDataMap.erase(obj->GetGUID());
+
+                if (unloadingGrid)
+                    return;
+
+                // Handle expedited spawns
+                uint32 spawnsNeeded = realPool->GetMinSpawnable();
+                if (spawnsNeeded > 0)
+                {
+                    if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
+                    {
+                        if (SpawnPool(pool->poolData.poolId, 1))
+                            ownerMap->RemoveRespawnTime(info, false);
+                    }
+                }
+            }
+        }
+
+        // Clear creature pool info
+        gameObject->SetPoolData(nullptr, nullptr, nullptr);
+    }
 }
 
 void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
@@ -857,11 +894,13 @@ void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
                 // Handle expedited spawns
                 uint32 spawnsNeeded = realPool->GetMinSpawnable();
                 if (spawnsNeeded > 0)
+                {
                     if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
                     {
                         if (SpawnPool(pool->poolData.poolId, 1))
                             ownerMap->RemoveRespawnTime(info, false);
                     }
+                }
             }
         }
 
@@ -998,9 +1037,47 @@ bool MapPoolMgr::SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId)
     return true;
 }
 
-bool MapPoolMgr::SpawnGameObject(uint32 /*poolId*/, uint32 /*entry*/, uint32 /*pointId*/)
+bool MapPoolMgr::SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId)
 {
-    return false;
+    MapPoolEntry* pool = _getPool(poolId);
+    if (!pool)
+        return false;
+
+    MapPoolSpawnPoint* spawnPoint = _getSpawnPoint(pool, pointId);
+    if (!spawnPoint)
+        return false;
+
+    MapPoolGameObject* goEntry = _getSpawnGameObject(pool, entry);
+
+    GridCoord grid = Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY);
+    if (ownerMap->IsGridLoaded(grid.GetId()))
+    {
+        GameObjectData* newData = new GameObjectData();
+        if (!GenerateData(pool, goEntry, spawnPoint, newData))
+        {
+            delete newData;
+            return false;
+        }
+
+        GameObject* newGameObject = new GameObject();
+        if (!newGameObject->LoadFromDB(0, ownerMap, true, true, newData))
+        {
+            delete newGameObject;
+            delete newData;
+            return false;
+        }
+        _poolGameObjectDataMap[newGameObject->GetGUID()] = newData;
+        spawnPoint->currentObject = newGameObject;
+        newGameObject->SetPoolData(pool, spawnPoint, goEntry);
+    }
+
+    // Hold Creature data while pooled object is spawned
+
+    // Register current creature to spawnpoint
+    spawnPoint->currentItem = goEntry;
+
+    pool->AdjustSpawned(1);
+    return true;
 }
 
 bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPoolSpawnPoint* point, CreatureData* data)
@@ -1077,8 +1154,48 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPo
     return false;
 }
 
-bool MapPoolMgr::GenerateData(uint32 /*poolId*/, uint32 /*entry*/, uint32 /*pointId*/, GameObjectData* /*data*/)
+bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, MapPoolSpawnPoint* point, GameObjectData* data)
 {
+    if (GameObjectTemplate const* goInfo = sObjectMgr->GetGameObjectTemplate(goEntry->entry))
+    {
+        MapPoolGameObjectOverride const* odata = GetGameObjectOverride(point->pointId, goEntry->entry);
+        // This is so messy, but should handle priority specific override, creature override, spawnpoint override, pool data
+        data->animprogress = odata && odata->animProgress ? odata->animProgress :
+            goEntry->overrideData && goEntry->overrideData->animProgress ? goEntry->overrideData->animProgress :
+            point->gameObjectOverride && point->gameObjectOverride->animProgress ? point->gameObjectOverride->animProgress :
+            goEntry->animProgress;
+
+        data->goState = GOState(odata && odata->state ? odata->state :
+            goEntry->overrideData && goEntry->overrideData->state ? goEntry->overrideData->state :
+            point->gameObjectOverride && point->gameObjectOverride->state ? point->gameObjectOverride->state :
+            goEntry->state);
+
+        data->phaseMask = odata && odata->phaseMask ? odata->phaseMask :
+            goEntry->overrideData && goEntry->overrideData->phaseMask ? goEntry->overrideData->phaseMask :
+            point->gameObjectOverride && point->gameObjectOverride->phaseMask ? point->gameObjectOverride->phaseMask :
+            pool->poolData.phaseMask;
+
+        data->spawnMask = odata && odata->spawnMask ? odata->spawnMask :
+            goEntry->overrideData && goEntry->overrideData->spawnMask ? goEntry->overrideData->spawnMask :
+            point->gameObjectOverride && point->gameObjectOverride->spawnMask ? point->gameObjectOverride->spawnMask :
+            pool->poolData.spawnMask;
+
+        std::string scriptName = odata && odata->scriptName.empty() ? odata->scriptName :
+            goEntry->overrideData && goEntry->overrideData->scriptName.empty() ? goEntry->overrideData->scriptName :
+            point->gameObjectOverride && point->gameObjectOverride->scriptName.empty() ? point->gameObjectOverride->scriptName : "";
+
+        data->scriptId = sObjectMgr->GetScriptId(scriptName);
+        data->artKit = 0;
+        data->goState = GO_STATE_READY;
+        data->spawnPoint = WorldLocation(ownerMapId, point->positionX, point->positionY, point->positionZ, point->positionO);
+        data->rotation = QuaternionData(point->rotation0, point->rotation1, point->rotation2, point->rotation3);
+        data->spawnId = 0;
+        data->id = goEntry->entry;
+        data->dbData = true;
+        data->spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();  // @ToDo: Make a proper default group
+        return true;
+    }
+
     return false;
 }
 
@@ -1253,7 +1370,27 @@ bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
             newCreature->SetPoolData(pool, spawnPoint, cEntry);
             return true;
         }
-        // @ToDo: More gameobject magic needed
+        else if (MapPoolGameObject* goEntry = spawnPoint->currentItem->ToGameObjectItem())
+        {
+            GameObjectData* newData = new GameObjectData();
+            if (!GenerateData(pool, goEntry, spawnPoint, newData))
+            {
+                delete newData;
+                return false;
+            }
+
+            GameObject* newGameObject = new GameObject();
+            if (!newGameObject->LoadFromDB(0, ownerMap, true, true, newData))
+            {
+                delete newGameObject;
+                delete newData;
+                return false;
+            }
+            _poolGameObjectDataMap[newGameObject->GetGUID()] = newData;
+            spawnPoint->currentObject = newGameObject;
+            newGameObject->SetPoolData(pool, spawnPoint, goEntry);
+            return true;
+        }
     }
 
     return false;

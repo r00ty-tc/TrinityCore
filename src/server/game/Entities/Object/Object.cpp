@@ -1050,7 +1050,7 @@ void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/, bool unloadingGrid
     if (Transport* transport = GetTransport())
         transport->RemovePassenger(this);
 
-    if (Creature* creature = ToCreature())
+    if (GetTypeId() == TYPEID_UNIT || GetTypeId() == TYPEID_GAMEOBJECT)
         GetMap()->GetMapPoolMgr()->HandleDespawn(this, unloadingGrid);
 }
 

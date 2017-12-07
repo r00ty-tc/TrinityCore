@@ -30,6 +30,8 @@
 #include "GroupMgr.h"
 #include "Log.h"
 #include "LootMgr.h"
+#include "Map.h"
+#include "MapPoolMgr.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "OutdoorPvPMgr.h"
@@ -138,12 +140,19 @@ GameObject::GameObject() : WorldObject(false), MapObject(),
 
     ResetLootMode(); // restore default loot mode
     m_stationaryPosition.Relocate(0.0f, 0.0f, 0.0f, 0.0f);
+    m_poolEntry = nullptr;
+    m_poolGameObject = nullptr;
+    m_poolPoint = nullptr;
 }
 
 GameObject::~GameObject()
 {
     delete m_AI;
     delete m_model;
+    ASSERT(!m_poolEntry, "GameObject destroyed with pool data attached");
+    ASSERT(!m_poolGameObject, "GameObject destroyed with pool GameObject data attached");
+    ASSERT(!m_poolPoint, "GameObject destroyed with pool spawnpoint data attached");
+
     //if (m_uint32Values)                                      // field array can be not exist if GameOBject not loaded
     //    CleanupsBeforeDelete();
 }
@@ -1020,9 +1029,9 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     WorldDatabase.CommitTransaction(trans);
 }
 
-bool GameObject::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool)
+bool GameObject::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap, bool, GameObjectData* goData)
 {
-    GameObjectData const* data = sObjectMgr->GetGameObjectData(spawnId);
+    GameObjectData const* data = goData ? goData : sObjectMgr->GetGameObjectData(spawnId);
 
     if (!data)
     {
@@ -1200,8 +1209,18 @@ void GameObject::SaveRespawnTime(uint32 forceDelay, bool savetodb)
         }
 
         uint32 thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
+        uint32 poolId = m_poolEntry ? m_poolEntry->poolData.poolId : 0;
+        uint32 pointId = m_poolPoint ? m_poolPoint->pointId : 0;
         // ToDo: Fix this up when GO code updated for pooling
-        GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, m_spawnId, GetEntry(), thisRespawnTime, GetZoneId(), Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId(), m_goData->dbData ? savetodb : false);
+        if (poolId != 0)
+        {
+            thisRespawnTime = forceDelay ? time(nullptr) + forceDelay : time(nullptr) + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
+            GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), 0, thisRespawnTime, GetZoneId(), poolId, pointId, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId(), m_goData->dbData ? savetodb : false);
+        }
+        else
+        {
+            GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, m_spawnId, GetEntry(), thisRespawnTime, GetZoneId(), poolId, pointId, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId(), m_goData->dbData ? savetodb : false);
+        }
     }
 }
 

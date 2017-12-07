@@ -81,6 +81,11 @@ struct MapPoolCreature : MapPoolItem
     uint32 unitFlags;
     uint32 dynamicFlags;
     MapPoolCreatureOverride* overrideData;
+
+    MapPoolCreature()
+    {
+        type = POOLTYPE_CREATURE;
+    }
 };
 
 struct MapPoolGameObject : MapPoolItem
@@ -88,6 +93,11 @@ struct MapPoolGameObject : MapPoolItem
     uint8 animProgress;
     uint8 state;
     MapPoolGameObjectOverride* overrideData;
+
+    MapPoolGameObject()
+    {
+        type = POOLTYPE_GAMEOBJECT;
+    }
 };
 
 struct MapPoolOverride
@@ -123,6 +133,11 @@ struct MapPoolCreatureOverride : MapPoolOverride
     uint32 bytes2;
     uint32 emote;
     std::vector<uint32> auras;
+
+    MapPoolCreatureOverride()
+    {
+        type = POOLTYPE_CREATURE;
+    }
 };
 
 struct MapPoolGameObjectOverride : MapPoolOverride
@@ -135,6 +150,11 @@ struct MapPoolGameObjectOverride : MapPoolOverride
     float parentRotation3;
     uint8 invisibilityType;
     uint32 invisibilityValue;
+
+    MapPoolGameObjectOverride()
+    {
+        type = POOLTYPE_GAMEOBJECT;
+    }
 };
 
 struct MapPoolSpawn
@@ -214,7 +234,7 @@ protected:
     CreatureData* _getCreatureData(ObjectGuid guid);
     GameObjectData* _getGameObjectData(ObjectGuid guid);
     bool GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPoolSpawnPoint* point, CreatureData* data);
-    bool GenerateData(uint32 poolId, uint32 entry, uint32 pointId, GameObjectData* data);
+    bool GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, MapPoolSpawnPoint* point, GameObjectData* data);
     bool SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId);
     bool SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
 
