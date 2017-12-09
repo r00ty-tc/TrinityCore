@@ -172,6 +172,7 @@ private:
     MapPoolMgr* ownerManager;
     void UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const;
     bool PerformSpawn();
+    void GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree = true);
 
 public:
     MapPoolTemplate poolData;

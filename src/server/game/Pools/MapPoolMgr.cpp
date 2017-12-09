@@ -235,14 +235,6 @@ void MapPoolMgr::LoadMapPools()
 
             if (MapPoolEntry* thisPool = _getPool(poolId))
             {
-                // Fail if adding spawns to a pool with children
-                // Only botton level pools can have spawns, upper/mid level pools are for organization of pools
-                if (thisPool->childPools.size() != 0)
-                {
-                    TC_LOG_FATAL("server.loading", "[Map %u] Attempt to add spawnpoints to pool %u with children", ownerMapId, poolId);
-                    ABORT();
-                }
-
                 // Check if point already found (shouldn't be possible)
                 for (MapPoolSpawnPoint* pointData : thisPool->spawnList)
                 {
@@ -1308,11 +1300,7 @@ bool MapPoolEntry::PerformSpawn()
 {
     // Build spawnpoint shortlist
     std::vector<MapPoolSpawnPoint*> freeList;
-    for (MapPoolSpawnPoint* point : spawnList)
-    {
-        if (!point->currentItem)
-            freeList.push_back(point);
-    }
+    GetSpawnList(freeList);
 
     if (freeList.size() == 0)
         return false;
@@ -1340,6 +1328,16 @@ bool MapPoolEntry::PerformSpawn()
         }
     }
     return false;
+}
+
+void MapPoolEntry::GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree)
+{
+    for (MapPoolSpawnPoint* point : spawnList)
+        if (!onlyFree || !point->currentItem)
+            pointList.push_back(point);
+
+    if (parentPool)
+        parentPool->GetSpawnList(pointList, onlyFree);
 }
 
 bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
