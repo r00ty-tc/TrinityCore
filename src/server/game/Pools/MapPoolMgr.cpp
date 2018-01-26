@@ -705,8 +705,10 @@ MapPoolSpawnPoint* MapPoolMgr::_getSpawnPoint(MapPoolEntry const* pool, uint32 p
         return (spawns->pointId == pointId);
     });
 
-    if (spawnItr == pool->spawnList.end())
+    if (spawnItr == pool->spawnList.end() && !pool->parentPool)
         return nullptr;
+    else if (spawnItr == pool->spawnList.end())
+        return _getSpawnPoint(pool->parentPool, pointId);
 
     return *spawnItr;
 }
@@ -831,17 +833,17 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
 
                 _poolGameObjectDataMap.erase(obj->GetGUID());
 
-                if (unloadingGrid)
-                    return;
-
-                // Handle expedited spawns
-                uint32 spawnsNeeded = realPool->GetMinSpawnable();
-                if (spawnsNeeded > 0)
+                if (!unloadingGrid)
                 {
-                    if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
+                    // Handle expedited spawns
+                    uint32 spawnsNeeded = realPool->GetMinSpawnable();
+                    if (spawnsNeeded > 0)
                     {
-                        if (SpawnPool(pool->poolData.poolId, 1))
-                            ownerMap->RemoveRespawnTime(info, false);
+                        if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
+                        {
+                            if (SpawnPool(pool->poolData.poolId, 1))
+                                ownerMap->RemoveRespawnTime(info, false);
+                        }
                     }
                 }
             }
@@ -901,35 +903,66 @@ void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
 
 time_t MapPoolMgr::GenerateRespawnTime(WorldObject* obj)
 {
-    if (Creature* creature = obj->ToCreature())
+    MapPoolCreature const* cEntry = nullptr;
+    MapPoolGameObject const* goEntry = nullptr;
+    MapPoolEntry const * pool;
+    MapPoolSpawnPoint const * spawnPoint;
+
+    Creature* creature = obj->ToCreature();
+    GameObject* go = obj->ToGameObject();
+
+    if (creature)
     {
-        MapPoolEntry const* pool = creature->GetPoolEntry();
-        MapPoolSpawnPoint const* spawnPoint = creature->GetPoolPoint();
-        MapPoolCreature const* cEntry = creature->GetPoolCreature();
+        cEntry = creature->GetPoolCreature();
+        pool = creature->GetPoolEntry();
+        spawnPoint = creature->GetPoolPoint();
+    }
+    else if (go)
+    {
+        goEntry = go->GetPoolGameObject();
+        pool = go->GetPoolEntry();
+        spawnPoint = go->GetPoolPoint();
+    }
+    else
+    {
+        return time_t(0);
+    }
 
-        // If we don't have all these things, it's not a valid pool creature
-        if (!pool || !spawnPoint || !cEntry)
-            return time_t(0);
 
-        // Check for specific override for this combination
-        if (MapPoolCreatureOverride* override = _getCreatureOverride(spawnPoint->pointId, creature->GetEntry()))
-        {
-            if (override->spawntimeSecsMin && override->spawntimeSecsMax)
-                return static_cast<time_t>(urand(override->spawntimeSecsMin, override->spawntimeSecsMax));
-        }
+    // If we don't have all these things, it's not a valid pool creature
+    if (!pool || !spawnPoint || (!cEntry && !goEntry))
+        return time_t(0);
 
-        // Check for creature entry override next
+    // Check for specific override for this combination
+    if (MapPoolCreatureOverride* override = _getCreatureOverride(spawnPoint->pointId, obj->GetEntry()))
+    {
+        if (override->spawntimeSecsMin && override->spawntimeSecsMax)
+            return static_cast<time_t>(urand(override->spawntimeSecsMin, override->spawntimeSecsMax));
+    }
+
+    // Check for creature entry override next
+    if (creature)
+    {
         if (cEntry->overrideData && cEntry->overrideData->spawntimeSecsMin && cEntry->overrideData->spawntimeSecsMax)
             return static_cast<time_t>(urand(cEntry->overrideData->spawntimeSecsMin, cEntry->overrideData->spawntimeSecsMax));
 
         // Next check for spawn point override
         if (spawnPoint->creatureOverride && spawnPoint->creatureOverride->spawntimeSecsMin && spawnPoint->creatureOverride->spawntimeSecsMax)
             return static_cast<time_t>(urand(spawnPoint->creatureOverride->spawntimeSecsMin, spawnPoint->creatureOverride->spawntimeSecsMax));
-
-        // Finally check pool
-        if (pool->poolData.spawntimeSecsMin && pool->poolData.spawntimeSecsMax)
-            return static_cast<time_t>(urand(pool->poolData.spawntimeSecsMin, pool->poolData.spawntimeSecsMax));
     }
+    else
+    {
+        if (goEntry->overrideData && goEntry->overrideData->spawntimeSecsMin && goEntry->overrideData->spawntimeSecsMax)
+            return static_cast<time_t>(urand(goEntry->overrideData->spawntimeSecsMin, goEntry->overrideData->spawntimeSecsMax));
+
+        // Next check for spawn point override
+        if (spawnPoint->gameObjectOverride && spawnPoint->gameObjectOverride->spawntimeSecsMin && spawnPoint->gameObjectOverride->spawntimeSecsMax)
+            return static_cast<time_t>(urand(spawnPoint->gameObjectOverride->spawntimeSecsMin, spawnPoint->gameObjectOverride->spawntimeSecsMax));
+    }
+
+    // Finally check pool
+    if (pool->poolData.spawntimeSecsMin && pool->poolData.spawntimeSecsMax)
+        return static_cast<time_t>(urand(pool->poolData.spawntimeSecsMin, pool->poolData.spawntimeSecsMax));
 
     // If we make it here, we don't have anything
     return time_t(0);
@@ -1184,6 +1217,7 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, Ma
         data->spawnId = 0;
         data->id = goEntry->entry;
         data->dbData = true;
+        data->spawntimesecs = 300;      // This isn't actually used to respawn
         data->spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();  // @ToDo: Make a proper default group
         return true;
     }
@@ -1271,7 +1305,9 @@ bool MapPoolEntry::SpawnSingle()
     }
     else
     {
-        return PerformSpawn();
+        std::vector<MapPoolSpawnPoint*> spawns;
+        GetSpawnList(spawns);
+        return PerformSpawn(spawns);
     }
     return false;
 }
@@ -1281,7 +1317,9 @@ bool MapPoolEntry::SpawnSingleToMinimum()
     if (!GetMinSpawnable())
         return false;
 
-    if (spawnList.size() > 0 && PerformSpawn())
+    std::vector<MapPoolSpawnPoint*> spawns;
+    GetSpawnList(spawns);
+    if (spawns.size() > 0 && PerformSpawn(spawns))
         return true;
 
     if (!childPools.size())
@@ -1296,17 +1334,17 @@ bool MapPoolEntry::SpawnSingleToMinimum()
     return false;
 }
 
-bool MapPoolEntry::PerformSpawn()
+bool MapPoolEntry::PerformSpawn(std::vector<MapPoolSpawnPoint*>& spawns)
 {
     // Build spawnpoint shortlist
-    std::vector<MapPoolSpawnPoint*> freeList;
-    GetSpawnList(freeList);
+    if (spawns.size() ==0)
+        GetSpawnList(spawns);
 
-    if (freeList.size() == 0)
+    if (spawns.size() == 0 || itemList.size() == 0)
         return false;
 
-    uint32 spawnChoice = urand(0, freeList.size() - 1);
-    MapPoolSpawnPoint* point = freeList[spawnChoice];
+    uint32 spawnChoice = urand(0, spawns.size() - 1);
+    MapPoolSpawnPoint* point = spawns[spawnChoice];
 
     float chanceTotal = 0.0f;
     for (MapPoolItem* item : itemList)

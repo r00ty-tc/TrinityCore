@@ -835,6 +835,8 @@ void GameObject::Update(uint32 diff)
                 if (!sWorld->getBoolConfig(CONFIG_SAVE_RESPAWN_TIME_IMMEDIATELY))
                     SaveRespawnTime(0, false);
 
+                GetMap()->GetMapPoolMgr()->HandleDespawn(this);
+
                 // Then despawn
                 AddObjectToRemoveList();
                 return;
@@ -909,6 +911,8 @@ void GameObject::Delete()
 
     if (GameObjectOverride const* goOverride = GetGameObjectOverride())
         SetUInt32Value(GAMEOBJECT_FLAGS, goOverride->Flags);
+
+    GetMap()->GetMapPoolMgr()->HandleDespawn(this);
 
     uint32 poolid = GetSpawnId() ? sPoolMgr->IsPartOfAPool<GameObject>(GetSpawnId()) : 0;
     if (poolid)

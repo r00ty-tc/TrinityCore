@@ -25,7 +25,6 @@
 #include "Loot.h"
 #include "MapObject.h"
 #include "SharedDefines.h"
-#include "MapPoolMgr.h"
 
 class GameObjectAI;
 class GameObjectModel;
@@ -35,7 +34,7 @@ class Transport;
 class Unit;
 class MapPoolEntry;
 struct MapPoolSpawnPoint;
-struct MapPoolCreature;
+struct MapPoolGameObject;
 struct TransportAnimation;
 enum TriggerCastFlags : uint32;
 
