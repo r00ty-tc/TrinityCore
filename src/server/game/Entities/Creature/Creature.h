@@ -65,6 +65,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 {
     public:
         explicit Creature(bool isWorldObject = false);
+        virtual ~Creature();
 
         void AddToWorld() override;
         void RemoveFromWorld() override;
