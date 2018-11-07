@@ -18,6 +18,7 @@
 
 #include "DatabaseEnv.h"
 #include "MapPoolMgr.h"
+#include "MapPoolEntry.h"
 #include "Log.h"
 #include "ObjectMgr.h"
 #include <boost/container/flat_set.hpp>
@@ -28,29 +29,6 @@
 #include "SpellMgr.h"
 #include "SpellInfo.h"
 #include "Random.h"
-
-// Checks if poolId is anywhere in the hierarchy already
-bool MapPoolEntry::CheckHierarchy(uint32 poolId, bool callingSelf) const
-{
-    if (poolData.poolId == poolId)
-        return true;
-
-    if (parentPool != nullptr && !callingSelf)
-    {
-        // If this pool isn't the top pool, seek poolid, starting at the top
-        return GetTopPool()->CheckHierarchy(poolId, true);
-    }
-    else
-    {
-        // Search each child pool
-        for (MapPoolEntry const* pool : childPools)
-        {
-            if (pool->CheckHierarchy(poolId, true))
-                return true;
-        }
-    }
-    return false;
-}
 
 MapPoolMgr::MapPoolMgr(Map* map)
 {
@@ -685,7 +663,7 @@ void MapPoolMgr::SpawnMap()
         MapPoolEntry* pool = &itr->second;
         // Only process top level pools
         if (!pool->parentPool)
-            SpawnPool(pool->poolData.poolId);
+            SpawnPool(pool);
     }
 }
 
@@ -970,33 +948,39 @@ time_t MapPoolMgr::GenerateRespawnTime(WorldObject* obj)
 
 uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
 {
-    uint32 spawned = 0;
     if (MapPoolEntry* pool = _getPool(poolId))
+        return SpawnPool(pool, items);
+
+    return 0;
+}
+
+uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
+{
+    uint32 spawned = 0;
+    // Always spawn from top level pool
+    MapPoolEntry* workPool = pool->parentPool ? pool->topPool : pool;
+
+    bool minReached = false;
+
+    if (items == 0)
     {
-        if (items == 0)
-        {
-            items = pool->GetMaxSpawnable();
+        items = pool->GetMaxSpawnable();
 
-            // Check for pending respawns
-            std::vector<RespawnInfo*> ri;
-            if (ownerMap->GetPoolRespawnInfo(poolId, ri))
-               items -= ri.size();
-        }
+        // Check for pending respawns
+        std::vector<RespawnInfo*> ri;
+        if (ownerMap->GetPoolRespawnInfo(pool->poolData.poolId, ri))
+            items -= ri.size();
+    }
 
-        // Always spawn from top level pool
-        MapPoolEntry* workPool = pool->parentPool ? pool->topPool : pool;
+    for (uint32 item = 0; item < items; ++item)
+    {
+        if (!minReached && workPool->SpawnSingleToMinimum())
+            ++spawned;
+        else
+            minReached = true;
 
-        bool minReached = false;
-        for (uint32 item = 0; item < items; ++item)
-        {
-            if (!minReached && workPool->SpawnSingleToMinimum())
-                ++spawned;
-            else
-                minReached = true;
-
-            if (minReached)
-                spawned += workPool->SpawnSingle() ? 1 : 0;
-        }
+        if (minReached)
+            spawned += workPool->SpawnSingle() ? 1 : 0;
     }
     return spawned;
 }
@@ -1223,159 +1207,6 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, Ma
     }
 
     return false;
-}
-
-uint32 MapPoolEntry::GetMinSpawnable() const
-{
-    uint32 minSpawns = 0;
-    uint32 maxSpawns = 0;
-    uint32 minNeeded = 0;
-    uint32 maxAllowed = 0;
-    UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
-    return minNeeded;
-}
-
-uint32 MapPoolEntry::GetMaxSpawnable() const
-{
-    uint32 minSpawns = 0;
-    uint32 maxSpawns = 0;
-    uint32 minNeeded = 0;
-    uint32 maxAllowed = 0;
-    UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
-    return maxAllowed;
-}
-
-void MapPoolEntry::AdjustSpawned(int adjust, bool onlyAggregate)
-{
-    if (!onlyAggregate && int32(spawnsThisPool + adjust) >= 0)
-        spawnsThisPool += adjust;
-
-    if (int32(spawnsAggregate + adjust) >= 0)
-        spawnsAggregate += adjust;
-
-    if (parentPool)
-        parentPool->AdjustSpawned(adjust, true);
-}
-
-void MapPoolEntry::UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const
-{
-    if (minSpawns == 0 || this->poolData.minLimit > minSpawns)
-        minSpawns = this->poolData.minLimit;
-
-    if (maxSpawns == 0 || this->poolData.maxLimit < minSpawns)
-        maxSpawns = this->poolData.maxLimit;
-
-    int32 minNeededThisLevel = minSpawns - spawnsAggregate;
-    if (minNeededThisLevel > 0 && minNeededThisLevel > static_cast<int32>(minNeeded))
-        minNeeded = minNeededThisLevel;
-
-    int32 maxAllowedThisLevel = maxSpawns - spawnsAggregate;
-    if (maxAllowedThisLevel > 0 && (maxAllowedThisLevel < static_cast<int32>(maxAllowed) || maxAllowed == 0))
-        maxAllowed = maxAllowedThisLevel;
-
-    if (parentPool)
-        parentPool->UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
-}
-
-bool MapPoolEntry::SpawnSingle()
-{
-    if (childPools.size() == 0 && (spawnList.size() == 0 || itemList.size() == 0))
-    {
-        TC_LOG_ERROR("maps.pool", "[Map %u] No child pools OR items to spawn for pool %u", poolData.mapId, poolData.poolId);
-        return false;
-    }
-
-    if (childPools.size() !=0)
-    {
-        float chanceTotal = 0.0f;
-        for (MapPoolEntry* entry : childPools)
-            chanceTotal += std::max(entry->chance, 1.0f);
-
-        float choice = frand(1.0f, chanceTotal);
-        chanceTotal = 0.0f;
-
-        for (MapPoolEntry* entry : childPools)
-        {
-            chanceTotal += std::max(entry->chance, 1.0f);
-            if (chanceTotal >= choice)
-            {
-                return entry->SpawnSingle();
-            }
-        }
-    }
-    else
-    {
-        std::vector<MapPoolSpawnPoint*> spawns;
-        GetSpawnList(spawns);
-        return PerformSpawn(spawns);
-    }
-    return false;
-}
-
-bool MapPoolEntry::SpawnSingleToMinimum()
-{
-    if (!GetMinSpawnable())
-        return false;
-
-    std::vector<MapPoolSpawnPoint*> spawns;
-    GetSpawnList(spawns);
-    if (spawns.size() > 0 && PerformSpawn(spawns))
-        return true;
-
-    if (!childPools.size())
-        return false;
-
-    for (MapPoolEntry* childPool : childPools)
-    {
-        if (childPool->SpawnSingleToMinimum())
-            return true;
-    }
-
-    return false;
-}
-
-bool MapPoolEntry::PerformSpawn(std::vector<MapPoolSpawnPoint*>& spawns)
-{
-    // Build spawnpoint shortlist
-    if (spawns.size() ==0)
-        GetSpawnList(spawns);
-
-    if (spawns.size() == 0 || itemList.size() == 0)
-        return false;
-
-    uint32 spawnChoice = urand(0, spawns.size() - 1);
-    MapPoolSpawnPoint* point = spawns[spawnChoice];
-
-    float chanceTotal = 0.0f;
-    for (MapPoolItem* item : itemList)
-        chanceTotal += std::max(item->chance, 1.0f);
-
-    float choice = frand(1.0f, chanceTotal);
-
-    chanceTotal = 0.0f;
-
-    for (MapPoolItem* item : itemList)
-    {
-        chanceTotal += std::max(item->chance, 1.0f);
-        if (chanceTotal >= choice)
-        {
-            if (item->ToCreatureItem())
-                return ownerManager->SpawnCreature(poolData.poolId, item->entry, point->pointId);
-            else
-                return ownerManager->SpawnGameObject(poolData.poolId, item->entry, point->pointId);
-        }
-    }
-    return false;
-}
-
-void MapPoolEntry::GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree)
-{
-    for (MapPoolSpawnPoint* point : spawnList)
-        if (!onlyFree || !point->currentItem)
-            pointList.push_back(point);
-
-    if (parentPool)
-        parentPool->GetSpawnList(pointList, onlyFree);
 }
 
 bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)

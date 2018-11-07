@@ -20,11 +20,11 @@
 #ifndef TRINITY_MAPPOOLHANDLER_H
 #define TRINITY_MAPPOOLHANDLER_H
 
+#include "MapPoolEntry.h"
 #include "Define.h"
 #include "Map.h"
 
 // Forward declare all the things
-struct MapPoolTemplate;
 struct MapPoolCreatureOverride;
 struct MapPoolCreature;
 struct MapPoolGameObjectOverride;
@@ -32,31 +32,6 @@ struct MapPoolGameObject;
 struct MapPoolSpawn;
 struct GameObjectData;
 struct CreatureData;
-
-enum PoolType
-{
-    POOLTYPE_CREATURE,
-    POOLTYPE_GAMEOBJECT,
-    POOLTYPE_MAX
-};
-
-struct MapPoolTemplate
-{
-    uint32 mapId;
-    uint32 poolId;
-    uint32 phaseMask;
-    uint8 spawnMask;
-    uint32 minLimit;
-    uint32 maxLimit;
-    uint8 movementType;
-    float spawnDist;
-    uint32 spawntimeSecsMin;
-    uint32 spawntimeSecsMax;
-    uint32 spawntimeSecsFast;
-    uint32 corpsetimeSecsLoot;
-    uint32 corpsetimeSecsNoLoot;
-    std::string description;
-};
 
 struct MapPoolItem
 {
@@ -165,53 +140,6 @@ struct MapPoolSpawn
     MapPoolSpawnPoint* pointData;
 };
 
-class MapPoolEntry
-{
-    friend MapPoolMgr;
-private:
-    MapPoolMgr* ownerManager;
-    void UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const;
-    bool PerformSpawn(std::vector<MapPoolSpawnPoint*>& spawns);
-    void GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree = true);
-
-public:
-    MapPoolTemplate poolData;
-    PoolType type;
-    MapPoolEntry* parentPool;
-    MapPoolEntry* topPool;
-    uint32 spawnsThisPool;
-    uint32 spawnsAggregate;
-    uint32 respawnCounter;
-    float chance;
-    std::vector<MapPoolEntry*> childPools;
-    std::vector<MapPoolSpawnPoint*> spawnList;
-    std::vector<MapPoolItem*> itemList;
-
-    MapPoolEntry()
-    {
-        type = POOLTYPE_CREATURE;
-        topPool = nullptr;
-        parentPool = nullptr;
-        ownerManager = nullptr;
-        spawnsThisPool = 0;
-        spawnsAggregate = 0;
-        chance = 0.0f;
-        respawnCounter = 1;
-    }
-
-    // Checks if poolId is anywhere in the hierarchy already
-    bool CheckHierarchy(uint32 poolId, bool callingSelf = false) const;
-
-    MapPoolEntry* GetTopPool() const { return parentPool == nullptr ? const_cast<MapPoolEntry*>(this) : parentPool->GetTopPool(); }
-    uint32 GetMaxSpawnable() const;
-    uint32 GetMinSpawnable() const;
-    void AdjustSpawned(int adjust, bool onlyAggregate = false);
-    bool SpawnSingle();
-    bool SpawnSingleToMinimum();
-    void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }
-    uint32 GetRespawnCounter() { return respawnCounter++; }
-};
-
 class TC_GAME_API MapPoolMgr
 {
     friend MapPoolEntry;
@@ -238,6 +166,7 @@ protected:
     bool GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, MapPoolSpawnPoint* point, GameObjectData* data);
     bool SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId);
     bool SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
+    uint32 SpawnPool(MapPoolEntry* pool, uint32 items = 0);
 
 public:
     MapPoolMgr(Map* map);
