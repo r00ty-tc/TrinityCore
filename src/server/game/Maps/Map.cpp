@@ -3279,19 +3279,17 @@ void Map::ProcessRespawns()
             break;
         if (next->poolId)
         {
-            if (GetMapPoolMgr()->SpawnPool(next->poolId, 1))
+            GetMapPoolMgr()->SpawnPool(next->poolId, 1);
+            auto bounds = _RespawnTimesByPoolId.equal_range(next->poolId);
+            for (auto itr = bounds.first; itr != bounds.second;++itr)
             {
-                auto bounds = _RespawnTimesByPoolId.equal_range(next->poolId);
-                for (auto itr = bounds.first; itr != bounds.second;++itr)
+                if (itr->second == next)
                 {
-                    if (itr->second == next)
-                    {
-                        _RespawnTimesByPoolId.erase(itr);
-                        break;
-                    }
+                    _RespawnTimesByPoolId.erase(itr);
+                    break;
                 }
-                RemoveRespawnTime(next, false);
             }
+            RemoveRespawnTime(next, false);
         }
         else if (CheckRespawn(next)) // see if we're allowed to respawn
         {

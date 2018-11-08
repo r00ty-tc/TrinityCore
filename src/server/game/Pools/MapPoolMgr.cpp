@@ -43,7 +43,7 @@ MapPoolMgr::~MapPoolMgr()
     for (std::pair<uint32, MapPoolEntry> mapResult : _poolMap)
     {
         mapResult.second.parentPool = nullptr;
-        mapResult.second.topPool = nullptr;
+        mapResult.second.rootPool = nullptr;
 
         // Don't iterate child pools, they will be reached in linear fashion
         mapResult.second.childPools.clear();
@@ -146,7 +146,7 @@ void MapPoolMgr::LoadMapPools()
             // Populate pool base values and initialize pool
             thisPool->type = static_cast<PoolType>(fields[1].GetUInt8());
             thisPool->parentPool = nullptr;
-            thisPool->topPool = nullptr;
+            thisPool->rootPool = nullptr;
             thisPool->childPools.clear();
             thisPool->spawnList.clear();
             thisPool->SetOwnerPoolMgr(this);
@@ -179,7 +179,7 @@ void MapPoolMgr::LoadMapPools()
                 {
                     thisPool->childPools.push_back(childPool);
                     childPool->parentPool = thisPool;
-                    thisPool->chance = fields[2].GetFloat();
+                    childPool->chance = fields[2].GetFloat();
                 }
                 else
                 {
@@ -194,8 +194,12 @@ void MapPoolMgr::LoadMapPools()
         } while (result->NextRow());
 
         // Now we need to sort out the top level for all pools
-        for (auto poolItr : _poolMap)
-            poolItr.second.topPool = poolItr.second.GetTopPool();
+        for (auto poolItr = _poolMap.begin(); poolItr != _poolMap.end();)
+        {
+            auto test = const_cast<MapPoolEntry*>(poolItr->second.GetRootPool());
+            poolItr->second.rootPool = test;
+            ++poolItr;
+        }
     }
 
     // Read Pool Spawnpoints
@@ -813,13 +817,16 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
 
                 if (!unloadingGrid)
                 {
+                    // Unlink spawn point
+                    point->currentItem = nullptr;
+
                     // Handle expedited spawns
                     uint32 spawnsNeeded = realPool->GetMinSpawnable();
                     if (spawnsNeeded > 0)
                     {
                         if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
                         {
-                            if (SpawnPool(pool->poolData.poolId, 1))
+                            if (SpawnPool(pool->rootPool, 1))
                                 ownerMap->RemoveRespawnTime(info, false);
                         }
                     }
@@ -958,7 +965,7 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
 {
     uint32 spawned = 0;
     // Always spawn from top level pool
-    MapPoolEntry* workPool = pool->parentPool ? pool->topPool : pool;
+    MapPoolEntry* workPool = pool->parentPool ? pool->rootPool : pool;
 
     bool minReached = false;
 
@@ -979,8 +986,8 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
         else
             minReached = true;
 
-        if (minReached)
-            spawned += workPool->SpawnSingle() ? 1 : 0;
+        if (minReached && workPool->SpawnSingle())
+            ++spawned;
     }
     return spawned;
 }

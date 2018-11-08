@@ -64,9 +64,8 @@ public:
     MapPoolTemplate poolData;
     PoolType type;
     MapPoolEntry* parentPool;
-    MapPoolEntry* topPool;
+    MapPoolEntry* rootPool;
     uint32 spawnsThisPool;
-    uint32 spawnsAggregate;
     uint32 respawnCounter;
     float chance;
     std::vector<MapPoolEntry*> childPools;
@@ -76,11 +75,10 @@ public:
     MapPoolEntry()
     {
         type = POOLTYPE_CREATURE;
-        topPool = nullptr;
+        rootPool = nullptr;
         parentPool = nullptr;
         ownerManager = nullptr;
         spawnsThisPool = 0;
-        spawnsAggregate = 0;
         chance = 0.0f;
         respawnCounter = 1;
     }
@@ -88,12 +86,14 @@ public:
     // Checks if poolId is anywhere in the hierarchy already
     bool CheckHierarchy(uint32 poolId, bool callingSelf = false) const;
 
-    MapPoolEntry* GetTopPool() const { return parentPool == nullptr ? const_cast<MapPoolEntry*>(this) : parentPool->GetTopPool(); }
+    MapPoolEntry const* GetRootPool() const { return parentPool == nullptr ? this : parentPool->GetRootPool(); }
     uint32 GetMaxSpawnable() const;
     uint32 GetMinSpawnable() const;
     void AdjustSpawned(int adjust, bool onlyAggregate = false);
     bool SpawnSingle();
     bool SpawnSingleToMinimum();
+    bool CanSpawn(bool minimum = false) const;
+    uint32 GetSpawnCount() const;
     void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }
     uint32 GetRespawnCounter() { return respawnCounter++; }
 };
