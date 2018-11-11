@@ -993,11 +993,11 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
 
         // Check for pending respawns
         std::vector<RespawnInfo*> ri;
-        TC_LOG_INFO("maps.pool", "[Map %u] Spawning pool %u with %u items", ownerMap->GetId(), workPool->poolData.poolId, items);
+        TC_LOG_DEBUG("maps.pool", "[Map %u] Spawning pool %u with %u items", ownerMap->GetId(), workPool->poolData.poolId, items);
         if (ownerMap->GetPoolRespawnInfo(workPool->poolData.poolId, ri))
         {
             items -= ri.size();
-            TC_LOG_INFO("maps.pool", "[Map %u] Adjusting pool %u with %lu pending respawns new count %u", ownerMap->GetId(), workPool->poolData.poolId, ri.size(), items);
+            TC_LOG_DEBUG("maps.pool", "[Map %u] Adjusting pool %u with %lu pending respawns new count %u", ownerMap->GetId(), workPool->poolData.poolId, ri.size(), items);
         }
     }
 
@@ -1011,7 +1011,7 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
         if (minReached && workPool->SpawnSingle())
             ++spawned;
     }
-    TC_LOG_INFO("maps.pool", "[Map %u] Spawned pool %u with %u items out of %u", ownerMap->GetId(), workPool->poolData.poolId, spawned, items);
+    TC_LOG_DEBUG("maps.pool", "[Map %u] Spawned pool %u with %u items out of %u", ownerMap->GetId(), workPool->poolData.poolId, spawned, items);
     return spawned;
 }
 
