@@ -1213,7 +1213,7 @@ void GameObject::SaveRespawnTime(uint32 forceDelay, bool savetodb)
         }
 
         uint32 thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
-        uint32 poolId = m_poolEntry ? m_poolEntry->poolData.poolId : 0;
+        uint32 poolId = m_poolEntry ? m_poolEntry->GetRootPoolId() : 0;
         uint32 pointId = m_poolPoint ? m_poolPoint->pointId : 0;
         // ToDo: Fix this up when GO code updated for pooling
         if (poolId != 0)

@@ -2387,7 +2387,7 @@ void Creature::SaveRespawnTime(uint32 forceDelay, bool savetodb)
     if (IsSummon() || (!m_spawnId && !m_poolEntry) || (m_creatureData && !m_creatureData->dbData))
         return;
 
-    uint32 poolId = m_poolEntry ? m_poolEntry->poolData.poolId : 0;
+    uint32 poolId = m_poolEntry ? m_poolEntry->GetRootPoolId() : 0;
     uint32 pointId = m_poolPoint ? m_poolPoint->pointId : 0;
 
     if (m_respawnCompatibilityMode)

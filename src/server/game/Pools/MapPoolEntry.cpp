@@ -53,37 +53,37 @@ bool MapPoolEntry::CheckHierarchy(uint32 poolId, bool callingSelf) const
     return false;
 }
 
-uint32 MapPoolEntry::GetMinSpawnable() const
+uint32 MapPoolEntry::_GetSpawnable(bool minimum, int currentLimit) const
 {
-    /*uint32 minSpawns = 0;
-    uint32 maxSpawns = 0;
-    uint32 minNeeded = 0;
-    uint32 maxAllowed = 0;
-    UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);*/
-    if (parentPool)
-        return rootPool->GetMinSpawnable();
+    uint32 poolLimit = minimum ? poolData.minLimit : poolData.maxLimit;
 
-    if (poolData.minLimit > spawnsThisPool)
-        return poolData.minLimit - spawnsThisPool;
+    // Am I a leaf node? If so, return the lowest of the current limit, or this leaf node's requirement
+    if (childPools.size() == 0)
+    {
+        return std::max(std::min(currentLimit, static_cast<int32>(poolLimit - spawnsThisPool)), 0);
+    }
+    else
+    {
+        // This is not a mistake, we only want to limit the leaf node to minimum
+        currentLimit = std::max(std::min(currentLimit, static_cast<int32>(poolData.maxLimit - spawnsThisPool)), 0);
 
-    return 0;
+        // Shortcut out, if we're already having nothing to spawn at this point
+        if (currentLimit <= 0)
+            return 0;
+
+        int32 maxChildLimit = 0;
+        for (auto thisPool : childPools)
+        {
+            maxChildLimit += thisPool->_GetSpawnable(minimum, currentLimit);
+        }
+
+        return std::max(std::min(currentLimit, maxChildLimit), 0);
+    }
 }
 
-uint32 MapPoolEntry::GetMaxSpawnable() const
+uint32 MapPoolEntry::GetSpawnable(bool minimum) const
 {
-    /*uint32 minSpawns = 0;
-    uint32 maxSpawns = 0;
-    uint32 minNeeded = 0;
-    uint32 maxAllowed = 0;
-    UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);*/
-
-    if (parentPool)
-        return rootPool->GetMaxSpawnable();
-
-    if (poolData.maxLimit > spawnsThisPool)
-        return poolData.maxLimit - spawnsThisPool;
-
-    return 0;
+    return _GetSpawnable(minimum, minimum ? poolData.minLimit : poolData.maxLimit);
 }
 
 void MapPoolEntry::AdjustSpawned(int adjust, bool onlyAggregate)
@@ -116,83 +116,34 @@ void MapPoolEntry::UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint
         parentPool->UpdateMaxSpawnable(minSpawns, maxSpawns, minNeeded, maxAllowed);
 }
 
-bool MapPoolEntry::SpawnSingle()
+bool MapPoolEntry::SpawnSingle(bool minimum)
 {
-    // Sanity check, if we're at capacity
-    if (!CanSpawn())
-        return false;
-
-    if (childPools.size() == 0 && (spawnList.size() == 0 || itemList.size() == 0))
-    {
-        TC_LOG_ERROR("maps.pool", "[Map %u] No child pools OR items to spawn for pool %u", poolData.mapId, poolData.poolId);
-        return false;
-    }
-
-    TC_LOG_DEBUG("maps.pool", "--> SpawnSingle: Attempting to spawn pool %u", poolData.poolId);
-    if (childPools.size() != 0)
-    {
-        float chanceTotal = 0.0f;
-        for (MapPoolEntry* entry : childPools)
-            chanceTotal += std::max(entry->chance, 1.0f);
-
-        float choice = frand(1.0f, chanceTotal);
-        TC_LOG_DEBUG("maps.pool", "--> SpawnSingle: Chose random value %f out of %f", choice, chanceTotal);
-        chanceTotal = 0.0f;
-
-        for (MapPoolEntry* entry : childPools)
-        {
-            chanceTotal += std::max(entry->chance, 1.0f);
-            if (chanceTotal >= choice)
-            {
-                TC_LOG_DEBUG("maps.pool", "--> SpawnSingle: Attempting to spawn pool %u", entry->poolData.poolId);
-                return entry->SpawnSingle();
-            }
-        }
-    }
-    else
-    {
-        std::vector<MapPoolSpawnPoint*> spawns;
-        GetSpawnList(spawns);
-        TC_LOG_DEBUG("maps.pool", "--> SpawnSingle: Attempting to spawn leaf pool %u, with %lu spawns", poolData.poolId, spawns.size());
-        return PerformSpawn(spawns);
-    }
-    return false;
-}
-
-bool MapPoolEntry::SpawnSingleToMinimum()
-{
-    if (!CanSpawn(true))
+    if (!CanSpawn(minimum))
         return false;
 
     // Handle leaf node
     if (!childPools.size())
     {
-        TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Attempting to spawn for leaf pool %u", poolData.poolId);
         std::vector<MapPoolSpawnPoint*> spawns;
         GetSpawnList(spawns);
-        TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Spawn list has %lu entries", spawns.size());
         if (spawns.size() > 0 && PerformSpawn(spawns))
             return true;
 
-        TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Failed to spawn pool %u", poolData.poolId);
         return false;
     }
 
-    TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Creating pool shortlist for parent pool %u", poolData.poolId);
     std::vector<MapPoolEntry*> includedPools;
     float chanceTotal = 0.0f;
     for (MapPoolEntry* childPool : childPools)
     {
-        if (childPool->CanSpawn(true))
+        if (childPool->_GetSpawnable(false, childPool->poolData.maxLimit) > 0)
         {
-            TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Adding child pool %u with chance %f for parent pool %u", childPool->poolData.poolId, childPool->chance, poolData.poolId);
             includedPools.push_back(childPool);
             chanceTotal += std::max(childPool->chance, 1.0f);
         }
     }
 
     float choice = frand(1.0f, chanceTotal);
-    TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Chose random number %f of total %f", choice, chanceTotal);
     chanceTotal = 0.0f;
 
     // Handle child pools
@@ -201,15 +152,13 @@ bool MapPoolEntry::SpawnSingleToMinimum()
         chanceTotal += std::max(childPool->chance, 1.0f);
         if (chanceTotal >= choice)
         {
-            TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Trying to spawn pool %u", childPool->poolData.poolId);
             // If we made a spawn, exit
-            if (childPool->SpawnSingleToMinimum())
+            if (childPool->SpawnSingle(minimum))
                 return true;
         }
     }
-    TC_LOG_DEBUG("maps.pool", "--> SpawnSingleToMinimum: Failed to spawn anything this time");
 
-    // Nothing more to spawn (for minimum)
+    // Nothing more to spawn
     return false;
 }
 
@@ -260,16 +209,7 @@ void MapPoolEntry::GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool
 
 bool MapPoolEntry::CanSpawn(bool minimum) const
 {
-    // Fail if we can't spawn even this pool
-    if (spawnsThisPool >= (minimum ? poolData.minLimit : poolData.maxLimit))
-        return false;
-
-    // Recursive check to the top. We only return true if ALL can spawn
-    if (parentPool)
-        return parentPool->CanSpawn(minimum);
-
-    // We only get here if we're the root and can spawn
-    return true;
+    return (GetSpawnable(minimum));
 }
 
 uint32 MapPoolEntry::GetSpawnCount() const

@@ -60,6 +60,11 @@ private:
     bool PerformSpawn(std::vector<MapPoolSpawnPoint*>& spawns);
     void GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree = true);
 
+protected:
+/*    uint32 _GetMaxSpawnable(int32 currentLimit) const;
+    uint32 _GetMinSpawnable(int32 currentLimit) const;*/
+    uint32 _GetSpawnable(bool minimum, int currentLimit) const;
+
 public:
     MapPoolTemplate poolData;
     PoolType type;
@@ -87,11 +92,10 @@ public:
     bool CheckHierarchy(uint32 poolId, bool callingSelf = false) const;
 
     MapPoolEntry const* GetRootPool() const { return parentPool == nullptr ? this : parentPool->GetRootPool(); }
-    uint32 GetMaxSpawnable() const;
-    uint32 GetMinSpawnable() const;
+    uint32 GetRootPoolId() const { return parentPool == nullptr ? poolData.poolId : parentPool->GetRootPool()->poolData.poolId; }
+    uint32 GetSpawnable(bool minimum = false) const;
     void AdjustSpawned(int adjust, bool onlyAggregate = false);
-    bool SpawnSingle();
-    bool SpawnSingleToMinimum();
+    bool SpawnSingle(bool minimum = false);
     bool CanSpawn(bool minimum = false) const;
     uint32 GetSpawnCount() const;
     void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }

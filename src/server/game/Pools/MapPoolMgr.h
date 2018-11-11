@@ -174,6 +174,8 @@ public:
     void LoadMapPools();
     void SpawnMap();
     MapPoolEntry const* GetPool(uint32 poolId);
+    MapPoolEntry const* GetRootPool(uint32 poolId);
+    uint32 GetRootPoolId(uint32 poolId);
     MapPoolCreatureOverride const* GetCreatureOverride(uint32 pointId, uint32 entry);
     MapPoolGameObjectOverride const* GetGameObjectOverride(uint32 pointId, uint32 entry);
     CreatureData const* GetCreatureData(ObjectGuid guid);

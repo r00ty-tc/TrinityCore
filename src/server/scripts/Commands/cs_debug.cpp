@@ -79,6 +79,10 @@ public:
             { "memoryleak",    rbac::RBAC_PERM_COMMAND_DEBUG_ASAN,               true,  &HandleDebugMemoryLeak,         "" },
             { "outofbounds",   rbac::RBAC_PERM_COMMAND_DEBUG_ASAN,               true,  &HandleDebugOutOfBounds,        "" },
         };
+        static std::vector<ChatCommand> debugPoolCommandTable =
+        {
+            { "dump",          rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolDumpCommand, "" },
+        };
         static std::vector<ChatCommand> debugCommandTable =
         {
             { "setbit",        rbac::RBAC_PERM_COMMAND_DEBUG_SETBIT,        false, &HandleDebugSet32BitCommand,         "" },
@@ -113,6 +117,7 @@ public:
             { "raidreset",     rbac::RBAC_PERM_COMMAND_INSTANCE_UNBIND,     false, &HandleDebugRaidResetCommand,        "" },
             { "neargraveyard", rbac::RBAC_PERM_COMMAND_NEARGRAVEYARD,       false, &HandleDebugNearGraveyard,           "" },
             { "instancespawn", rbac::RBAC_PERM_COMMAND_DEBUG_INSTANCESPAWN, false, &HandleDebugInstanceSpawns,          "" },
+            { "pool",          rbac::RBAC_PERM_COMMAND_DEBUG,               true,  nullptr,                             "", debugPoolCommandTable },
             { "dummy",         rbac::RBAC_PERM_COMMAND_DEBUG_DUMMY,         false, &HandleDebugDummyCommand,            "" },
             { "asan",          rbac::RBAC_PERM_COMMAND_DEBUG_ASAN,          true,  nullptr,                             "", debugAsanCommandTable },
             { "poolspawn",     rbac::RBAC_PERM_COMMAND_DEBUG,               false, &HandleDebugPoolSpawn,               "" },
@@ -1872,6 +1877,125 @@ public:
     {
         handler->SendSysMessage("This command does nothing right now. Edit your local core (cs_debug.cpp) to make it do whatever you need for testing.");
         return true;
+    }
+
+    static bool HandleDebugPoolDumpCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
+        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
+        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
+        if (mapId == -1)
+        {
+            handler->PSendSysMessage("Invalid Map ID %s", mapIdStr);
+            return true;
+        }
+        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
+        if (poolId == -1)
+        {
+            handler->PSendSysMessage("Invalid Pool ID %s", poolIdStr);
+        }
+
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        {
+            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            {
+                if (MapPoolEntry const* pool = poolMgr->GetPool(poolId))
+                {
+                    MapPoolEntry const* rootPool = pool->parentPool ? pool->rootPool : pool;
+                    if (rootPool != pool)
+                        handler->PSendSysMessage("Pool %u was not a root pool, using the root pool %u", pool->poolData.poolId, rootPool->poolData.poolId);
+
+                    handler->PSendSysMessage("Dumping pool data, starting at rool pool %u", rootPool->poolData.poolId);
+                    DumpPoolRecursive(handler, rootPool);
+                    return true;
+                }
+                else
+                {
+                    handler->PSendSysMessage("Unable to find pool %u in map %u", poolId, mapId);
+                    return true;
+                }
+            }
+            else
+            {
+                return true;
+            }
+
+        }
+        else
+        {
+            handler->PSendSysMessage("Unable to find base map %u", mapId);
+            return true;
+        }
+    }
+
+    static void DumpPoolRecursive(ChatHandler* handler, MapPoolEntry const* pool)
+    {
+        int32 level = 1;
+        MapPoolEntry const* upperPool = pool->parentPool;
+        while (upperPool)
+        {
+            level++;
+            upperPool = upperPool->parentPool;
+        }
+        std::string indent = "  ";
+        for (int count = 1; count < level; count++)
+        {
+            indent += "  ";
+        }
+
+        handler->PSendSysMessage("%sPool %u (%s), min %u, max %u, spawned %u can spawn min/max: %u/%u", indent.c_str(), pool->poolData.poolId,
+                    pool->poolData.description.c_str(), pool->poolData.minLimit, pool->poolData.maxLimit, pool->GetSpawnCount(),
+                    pool->GetSpawnable(true), pool->GetSpawnable());
+
+        if (pool->childPools.size() > 0)
+        {
+            // Not a leaf node, recurse
+            for (MapPoolEntry const* childPool : pool->childPools)
+            {
+                DumpPoolRecursive(handler, childPool);
+            }
+        }
+        else
+        {
+            // Leaf node, dump used spawn points
+            for (auto spawn : pool->spawnList)
+            {
+                if (WorldObject* obj = spawn->currentObject)
+                {
+                    if (Creature* creature = obj->ToCreature())
+                    {
+                        if (creature->GetPoolEntry() == pool)
+                            handler->PSendSysMessage("%s  Point %u (%f, %f, %f): Creature: %s", indent.c_str(), spawn->pointId, spawn->positionX, spawn->positionY,
+                                    spawn->positionZ, creature->GetGUID().ToString().c_str());
+                    }
+                    else if (GameObject* go = obj->ToGameObject())
+                    {
+                        if (go->GetPoolEntry() == pool)
+                            handler->PSendSysMessage("%s  Point %u (%f, %f, %f): GameObject: %s", indent.c_str(), spawn->pointId, spawn->positionX, spawn->positionY,
+                                    spawn->positionZ, go->GetGUID().ToString().c_str());
+                    }
+                }
+                else if (MapPoolItem* item = spawn->currentItem)
+                {
+                    if (item->poolId == pool->poolData.poolId)
+                    {
+                        if (MapPoolCreature* creature = item->ToCreatureItem())
+                        {
+                            handler->PSendSysMessage("%s  Point %u (%f, %f, %f): Creature (Not loaded), entry %u ", indent.c_str(), spawn->pointId, spawn->positionX,
+                                    spawn->positionY, spawn->positionZ, creature->entry);
+                        }
+                        else if (MapPoolGameObject* go = item->ToGameObjectItem())
+                        {
+                            handler->PSendSysMessage("%s  Point %u (%f, %f, %f): GameObject (Not loaded), entry %u ", indent.c_str(), spawn->pointId, spawn->positionX,
+                                    spawn->positionY, spawn->positionZ, go->entry);
+                        }
+                    }
+                }
+            }
+        }
     }
 };
 

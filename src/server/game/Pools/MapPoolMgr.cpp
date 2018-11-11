@@ -726,6 +726,22 @@ MapPoolEntry const* MapPoolMgr::GetPool(uint32 poolId)
     return _getPool(poolId);
 }
 
+MapPoolEntry const* MapPoolMgr::GetRootPool(uint32 poolId)
+{
+    if (auto thisPool = _getPool(poolId))
+        return (thisPool->parentPool ? thisPool->rootPool : thisPool);
+
+    return nullptr;
+}
+
+uint32 MapPoolMgr::GetRootPoolId(uint32 poolId)
+{
+    if (auto thisPool = GetRootPool(poolId))
+        return thisPool->poolData.poolId;
+
+    return 0;
+}
+
 MapPoolCreatureOverride* MapPoolMgr::_getCreatureOverride(uint32 pointId, uint32 entry)
 {
     auto override = _poolCreatureOverrideMap.find(PointEntryPair(pointId, entry));
@@ -821,12 +837,13 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
                     point->currentItem = nullptr;
 
                     // Handle expedited spawns
-                    uint32 spawnsNeeded = realPool->GetMinSpawnable();
+                    MapPoolEntry* rootPool = realPool->parentPool ? realPool->rootPool : realPool;
+                    uint32 spawnsNeeded = rootPool->GetSpawnable(true);
                     if (spawnsNeeded > 0)
                     {
-                        if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
+                        if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(rootPool->poolData.poolId))
                         {
-                            if (SpawnPool(pool->rootPool, 1))
+                            if (SpawnPool(rootPool, 1))
                                 ownerMap->RemoveRespawnTime(info, false);
                         }
                     }
@@ -871,12 +888,13 @@ void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
                     return;
 
                 // Handle expedited spawns
-                uint32 spawnsNeeded = realPool->GetMinSpawnable();
+                MapPoolEntry* rootPool = realPool->parentPool ? realPool->rootPool : realPool;
+                uint32 spawnsNeeded = rootPool->GetSpawnable(true);
                 if (spawnsNeeded > 0)
                 {
-                    if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(pool->poolData.poolId))
+                    if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(rootPool->poolData.poolId))
                     {
-                        if (SpawnPool(pool->poolData.poolId, 1))
+                        if (SpawnPool(rootPool, 1))
                             ownerMap->RemoveRespawnTime(info, false);
                     }
                 }
@@ -971,17 +989,21 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
 
     if (items == 0)
     {
-        items = pool->GetMaxSpawnable();
+        items = workPool->GetSpawnable();
 
         // Check for pending respawns
         std::vector<RespawnInfo*> ri;
-        if (ownerMap->GetPoolRespawnInfo(pool->poolData.poolId, ri))
+        TC_LOG_INFO("maps.pool", "[Map %u] Spawning pool %u with %u items", ownerMap->GetId(), workPool->poolData.poolId, items);
+        if (ownerMap->GetPoolRespawnInfo(workPool->poolData.poolId, ri))
+        {
             items -= ri.size();
+            TC_LOG_INFO("maps.pool", "[Map %u] Adjusting pool %u with %lu pending respawns new count %u", ownerMap->GetId(), workPool->poolData.poolId, ri.size(), items);
+        }
     }
 
     for (uint32 item = 0; item < items; ++item)
     {
-        if (!minReached && workPool->SpawnSingleToMinimum())
+        if (!minReached && workPool->SpawnSingle(true))
             ++spawned;
         else
             minReached = true;
@@ -989,6 +1011,7 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
         if (minReached && workPool->SpawnSingle())
             ++spawned;
     }
+    TC_LOG_INFO("maps.pool", "[Map %u] Spawned pool %u with %u items out of %u", ownerMap->GetId(), workPool->poolData.poolId, spawned, items);
     return spawned;
 }
 

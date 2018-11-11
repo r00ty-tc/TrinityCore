@@ -3151,7 +3151,8 @@ RespawnInfo* Map::GetRespawnInfo(SpawnObjectType type, ObjectGuid::LowType spawn
 
 bool Map::GetPoolRespawnInfo(uint32 poolId, std::vector<RespawnInfo*>& ri)
 {
-    auto bounds = _RespawnTimesByPoolId.equal_range(poolId);
+    uint32 rootPoolId = sMapPoolMgr->GetRootPoolId(poolId);
+    auto bounds = _RespawnTimesByPoolId.equal_range(rootPoolId);
     if (bounds.first == bounds.second)
         return false;
 
@@ -3279,7 +3280,9 @@ void Map::ProcessRespawns()
             break;
         if (next->poolId)
         {
-            GetMapPoolMgr()->SpawnPool(next->poolId, 1);
+            if (!GetMapPoolMgr()->SpawnPool(next->poolId, 1))
+                TC_LOG_ERROR("maps.pool", "[Map %u] Unable to spawn object for pool %u.", GetId(), next->poolId);
+
             auto bounds = _RespawnTimesByPoolId.equal_range(next->poolId);
             for (auto itr = bounds.first; itr != bounds.second;++itr)
             {
@@ -4406,7 +4409,8 @@ void Map::SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uin
     if (!respawnTime)
     {
         // Delete only
-        RemoveRespawnTime(type, spawnId, false, dbTrans);
+        if (!poolId)
+            RemoveRespawnTime(type, spawnId, false, dbTrans);
         return;
     }
 
@@ -4455,7 +4459,12 @@ void Map::LoadRespawnTimes()
 
             if (poolId)
             {
-                if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
+                if (poolId != sMapPoolMgr->GetRootPoolId(poolId))
+                {
+                    TC_LOG_ERROR("maps.pool", "Attempted to load respawn for pool %u, which is not the root pool %u ignored and removed", poolId, sMapPoolMgr->GetRootPoolId(poolId));
+                    RemoveRespawnTime(poolId, loguid);
+                }
+                else if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
                 {
                     // Not the best way to handle this, but need to keep spawn counter low
                     RemoveRespawnTime(poolId, loguid);
@@ -4484,8 +4493,15 @@ void Map::LoadRespawnTimes()
 
             if (poolId)
             {
-                if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
+                if (poolId != sMapPoolMgr->GetRootPoolId(poolId))
                 {
+                    TC_LOG_ERROR("maps.pool", "Attempted to load respawn for pool %u, which is not the root pool %u ignored and removed", poolId, sMapPoolMgr->GetRootPoolId(poolId));
+                    RemoveRespawnTime(poolId, loguid);
+                }
+                else if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
+                {
+                    // Not the best way to handle this, but need to keep spawn counter low
+                    RemoveRespawnTime(poolId, loguid);
                     Position pos = Position(spawnPoint->positionX, spawnPoint->positionY, spawnPoint->positionZ, spawnPoint->positionO);
                     SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, sMapPoolMgr->GetRespawnCounter(poolId), 0, time_t(respawnTime), GetZoneId(pos), poolId, pointId, Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), false);
                 }
