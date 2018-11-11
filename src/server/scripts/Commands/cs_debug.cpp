@@ -1908,7 +1908,7 @@ public:
                     if (rootPool != pool)
                         handler->PSendSysMessage("Pool %u was not a root pool, using the root pool %u", pool->GetPoolData()->poolId, rootPool->GetPoolData()->poolId);
 
-                    handler->PSendSysMessage("Dumping pool data, starting at rool pool %u", rootPool->GetPoolData()->poolId);
+                    handler->PSendSysMessage("Dumping pool data, starting at root pool %u", rootPool->GetPoolData()->poolId);
                     DumpPoolRecursive(handler, rootPool);
                     return true;
                 }

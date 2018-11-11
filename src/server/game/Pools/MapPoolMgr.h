@@ -152,6 +152,7 @@ private:
     std::unordered_map<PointEntryPair, MapPoolGameObjectOverride*> _poolGameObjectOverrideMap;
     std::unordered_map<ObjectGuid, CreatureData*> _poolCreatureDataMap;
     std::unordered_map<ObjectGuid ,GameObjectData*> _poolGameObjectDataMap;
+    void UpdatePoolDefaults(MapPoolEntry* pool);
 
 protected:
     MapPoolEntry* _getPool(uint32 poolId);

@@ -155,8 +155,8 @@ void MapPoolMgr::LoadMapPools()
     }
 
     // Read Pool hierarchy
-    //        0       1        2
-    // SELECT poolId, pointId, chance FROM mappool_spawns WHERE map = ?
+    //        0       1            2
+    // SELECT poolId, childPoolId, chance FROM mappool_hierarchy WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_HIERARCHY);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -183,7 +183,7 @@ void MapPoolMgr::LoadMapPools()
                 }
                 else
                 {
-                    TC_LOG_ERROR("server.loading", "[Map %u] Attempted to add spawn to pool %u with non existent child pool %u", ownerMapId, poolId, childPoolId);
+                    TC_LOG_ERROR("server.loading", "[Map %u] Attempted to add non-existent child pool %u to pool %u.", ownerMapId, childPoolId, poolId);
                 }
             }
             else
@@ -194,10 +194,20 @@ void MapPoolMgr::LoadMapPools()
         } while (result->NextRow());
 
         // Now we need to sort out the top level for all pools
+        std::set<MapPoolEntry*> workRootPools;
         for (auto poolItr = _poolMap.begin(); poolItr != _poolMap.end();)
         {
             auto test = const_cast<MapPoolEntry*>(poolItr->second.GetRootPool());
             poolItr->second.rootPool = test;
+            if (workRootPools.find(test) == workRootPools.end())
+                workRootPools.emplace(test);
+            ++poolItr;
+        }
+
+        // Trickle down some values from upper level pools, if unset
+        for (auto poolItr = workRootPools.begin(); poolItr != workRootPools.end();)
+        {
+            UpdatePoolDefaults(*poolItr);
             ++poolItr;
         }
     }
@@ -1306,4 +1316,36 @@ void MapPoolMgr::RegisterRespawn(uint32 poolId)
     // Register a respawn (subtract available spawns
     if (MapPoolEntry* pool = _getPool(poolId))
         pool->AdjustSpawned(1);
+}
+
+void MapPoolMgr::UpdatePoolDefaults(MapPoolEntry* pool)
+{
+    if (pool->parentPool)
+    {
+        MapPoolTemplate* poolData = &pool->poolData;
+        MapPoolTemplate* parentData = &pool->parentPool->poolData;
+
+        // Update data for this level
+        if (poolData->spawntimeSecsMin == 0)
+            poolData->spawntimeSecsMin = parentData->spawntimeSecsMin;
+        if (poolData->spawntimeSecsMax == 0)
+            poolData->spawntimeSecsMax = parentData->spawntimeSecsMax;
+        if (poolData->corpsetimeSecsLoot == 0)
+            poolData->corpsetimeSecsLoot = parentData->corpsetimeSecsLoot;
+        if (poolData->corpsetimeSecsNoLoot == 0)
+            poolData->corpsetimeSecsNoLoot = parentData->corpsetimeSecsNoLoot;
+        if (poolData->phaseMask == 0)
+            poolData->phaseMask = parentData->phaseMask;
+        if (poolData->spawnMask == 0)
+            poolData->spawnMask = parentData->spawnMask;
+    }
+
+    if (pool->GetChildPools()->size() == 0)
+        return;
+
+    // Handle next level down
+    for (MapPoolEntry* nextPool : *pool->GetChildPools())
+    {
+        UpdatePoolDefaults(nextPool);
+    }
 }

@@ -147,7 +147,7 @@ bool MapPoolEntry::SpawnSingle(bool minimum)
     chanceTotal = 0.0f;
 
     // Handle child pools
-    for (MapPoolEntry* childPool : childPools)
+    for (MapPoolEntry* childPool : includedPools)
     {
         chanceTotal += std::max(childPool->chance, 1.0f);
         if (chanceTotal >= choice)
