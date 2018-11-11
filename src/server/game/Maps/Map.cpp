@@ -3245,7 +3245,7 @@ void Map::RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, SQLTransaction d
     {
         SQLTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
         PreparedStatement* stmt;
-        if (pool->type == POOLTYPE_CREATURE)
+        if (pool->GetPoolType() == POOLTYPE_CREATURE)
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CREATURE_RESPAWN_BYPOOL);
         else
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GO_RESPAWN_BYPOOL);

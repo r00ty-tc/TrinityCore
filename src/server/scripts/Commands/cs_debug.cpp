@@ -1904,11 +1904,11 @@ public:
             {
                 if (MapPoolEntry const* pool = poolMgr->GetPool(poolId))
                 {
-                    MapPoolEntry const* rootPool = pool->parentPool ? pool->rootPool : pool;
+                    MapPoolEntry const* rootPool = pool->GetParentPool() ? pool->GetRootPool() : pool;
                     if (rootPool != pool)
-                        handler->PSendSysMessage("Pool %u was not a root pool, using the root pool %u", pool->poolData.poolId, rootPool->poolData.poolId);
+                        handler->PSendSysMessage("Pool %u was not a root pool, using the root pool %u", pool->GetPoolData()->poolId, rootPool->GetPoolData()->poolId);
 
-                    handler->PSendSysMessage("Dumping pool data, starting at rool pool %u", rootPool->poolData.poolId);
+                    handler->PSendSysMessage("Dumping pool data, starting at rool pool %u", rootPool->GetPoolData()->poolId);
                     DumpPoolRecursive(handler, rootPool);
                     return true;
                 }
@@ -1934,11 +1934,11 @@ public:
     static void DumpPoolRecursive(ChatHandler* handler, MapPoolEntry const* pool)
     {
         int32 level = 1;
-        MapPoolEntry const* upperPool = pool->parentPool;
+        MapPoolEntry const* upperPool = pool->GetParentPool();
         while (upperPool)
         {
             level++;
-            upperPool = upperPool->parentPool;
+            upperPool = upperPool->GetParentPool();
         }
         std::string indent = "  ";
         for (int count = 1; count < level; count++)
@@ -1946,14 +1946,14 @@ public:
             indent += "  ";
         }
 
-        handler->PSendSysMessage("%sPool %u (%s), min %u, max %u, spawned %u can spawn min/max: %u/%u", indent.c_str(), pool->poolData.poolId,
-                    pool->poolData.description.c_str(), pool->poolData.minLimit, pool->poolData.maxLimit, pool->GetSpawnCount(),
+        handler->PSendSysMessage("%sPool %u (%s), min %u, max %u, spawned %u can spawn min/max: %u/%u", indent.c_str(), pool->GetPoolData()->poolId,
+                    pool->GetPoolData()->description.c_str(), pool->GetPoolData()->minLimit, pool->GetPoolData()->maxLimit, pool->GetSpawnCount(),
                     pool->GetSpawnable(true), pool->GetSpawnable());
 
-        if (pool->childPools.size() > 0)
+        if (pool->GetChildPools()->size() > 0)
         {
             // Not a leaf node, recurse
-            for (MapPoolEntry const* childPool : pool->childPools)
+            for (MapPoolEntry* childPool : *pool->GetChildPools())
             {
                 DumpPoolRecursive(handler, childPool);
             }
@@ -1961,7 +1961,7 @@ public:
         else
         {
             // Leaf node, dump used spawn points
-            for (auto spawn : pool->spawnList)
+            for (auto spawn : *pool->GetSpawns())
             {
                 if (WorldObject* obj = spawn->currentObject)
                 {
@@ -1980,7 +1980,7 @@ public:
                 }
                 else if (MapPoolItem* item = spawn->currentItem)
                 {
-                    if (item->poolId == pool->poolData.poolId)
+                    if (item->poolId == pool->GetPoolData()->poolId)
                     {
                         if (MapPoolCreature* creature = item->ToCreatureItem())
                         {

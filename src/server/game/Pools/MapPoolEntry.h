@@ -59,14 +59,10 @@ private:
     void UpdateMaxSpawnable(uint32& minSpawns, uint32& maxSpawns, uint32& minNeeded, uint32& maxAllowed) const;
     bool PerformSpawn(std::vector<MapPoolSpawnPoint*>& spawns);
     void GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree = true);
+    MapPoolTemplate poolData;
 
 protected:
-/*    uint32 _GetMaxSpawnable(int32 currentLimit) const;
-    uint32 _GetMinSpawnable(int32 currentLimit) const;*/
     uint32 _GetSpawnable(bool minimum, int currentLimit) const;
-
-public:
-    MapPoolTemplate poolData;
     PoolType type;
     MapPoolEntry* parentPool;
     MapPoolEntry* rootPool;
@@ -76,6 +72,8 @@ public:
     std::vector<MapPoolEntry*> childPools;
     std::vector<MapPoolSpawnPoint*> spawnList;
     std::vector<MapPoolItem*> itemList;
+
+public:
 
     MapPoolEntry()
     {
@@ -100,5 +98,11 @@ public:
     uint32 GetSpawnCount() const;
     void SetOwnerPoolMgr(MapPoolMgr* poolMgr) { ownerManager = poolMgr; }
     uint32 GetRespawnCounter() { return respawnCounter++; }
+    MapPoolTemplate const* GetPoolData() const { return &poolData; }
+    MapPoolEntry const* GetParentPool() const { return parentPool; }
+    std::vector<MapPoolEntry*> const* GetChildPools() const { return &childPools; }
+    std::vector<MapPoolSpawnPoint*> const* GetSpawns() const { return &spawnList; }
+    std::vector<MapPoolItem*> const* GetItems() const { return &itemList; }
+    PoolType GetPoolType() const { return type; }
 };
 #endif
