@@ -165,6 +165,7 @@ protected:
     GameObjectData* _getGameObjectData(ObjectGuid guid);
     bool GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPoolSpawnPoint* point, CreatureData* data);
     bool GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, MapPoolSpawnPoint* point, GameObjectData* data);
+    void GenerateData(MapPoolItem* goEntry, MapPoolSpawnPoint* point, SpawnData* data);
     bool SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId);
     bool SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
     uint32 SpawnPool(MapPoolEntry* pool, uint32 items = 0);

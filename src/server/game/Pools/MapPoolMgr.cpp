@@ -1233,20 +1233,25 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, Ma
             goEntry->overrideData && goEntry->overrideData->scriptName.empty() ? goEntry->overrideData->scriptName :
             point->gameObjectOverride && point->gameObjectOverride->scriptName.empty() ? point->gameObjectOverride->scriptName : "";
 
+        GenerateData(goEntry, point, data);
         data->scriptId = sObjectMgr->GetScriptId(scriptName);
         data->artKit = 0;
         data->goState = GO_STATE_READY;
-        data->spawnPoint = WorldLocation(ownerMapId, point->positionX, point->positionY, point->positionZ, point->positionO);
         data->rotation = QuaternionData(point->rotation0, point->rotation1, point->rotation2, point->rotation3);
-        data->spawnId = 0;
-        data->id = goEntry->entry;
-        data->dbData = true;
-        data->spawntimesecs = 300;      // This isn't actually used to respawn
-        data->spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();  // @ToDo: Make a proper default group
         return true;
     }
 
     return false;
+}
+
+void MapPoolMgr::GenerateData(MapPoolItem* objEntry, MapPoolSpawnPoint* point, SpawnData* data)
+{
+        data->spawnPoint = WorldLocation(ownerMapId, point->positionX, point->positionY, point->positionZ, point->positionO);
+        data->spawnId = 0;
+        data->id = objEntry->entry;
+        data->dbData = true;
+        data->spawntimesecs = 300;      // This isn't actually used to respawn
+        data->spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();  // @ToDo: Make a proper default group
 }
 
 bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
