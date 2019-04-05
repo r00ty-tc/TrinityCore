@@ -216,3 +216,12 @@ uint32 MapPoolEntry::GetSpawnCount() const
 {
     return spawnsThisPool;
 }
+
+float MapPoolEntry::GetChance() const
+{
+    // Root pools have no chance factor
+    if (parentPool == nullptr)
+        return 0.0f;
+
+    return chance;
+}

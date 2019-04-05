@@ -104,5 +104,6 @@ public:
     std::vector<MapPoolSpawnPoint*> const* GetSpawns() const { return &spawnList; }
     std::vector<MapPoolItem*> const* GetItems() const { return &itemList; }
     PoolType GetPoolType() const { return type; }
+    float GetChance() const;
 };
 #endif
