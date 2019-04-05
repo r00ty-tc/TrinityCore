@@ -1946,8 +1946,8 @@ public:
             indent += "  ";
         }
 
-        handler->PSendSysMessage("%sPool %u (%s), min %u, max %u, spawned %u can spawn min/max: %u/%u", indent.c_str(), pool->GetPoolData()->poolId,
-                    pool->GetPoolData()->description.c_str(), pool->GetPoolData()->minLimit, pool->GetPoolData()->maxLimit, pool->GetSpawnCount(),
+        handler->PSendSysMessage("%sPool %u (%s), min %u, max %u, chance %.2f%%, spawned %u can spawn min/max: %u/%u", indent.c_str(), pool->GetPoolData()->poolId,
+                    pool->GetPoolData()->description.c_str(), pool->GetPoolData()->minLimit, pool->GetPoolData()->maxLimit, pool->GetChance(), pool->GetSpawnCount(),
                     pool->GetSpawnable(true), pool->GetSpawnable());
 
         if (pool->GetChildPools()->size() > 0)

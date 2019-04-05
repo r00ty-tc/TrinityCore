@@ -194,18 +194,18 @@ void MapPoolMgr::LoadMapPools()
         } while (result->NextRow());
 
         // Now we need to sort out the top level for all pools
-        std::set<MapPoolEntry*> workRootPools;
+        std::set<MapPoolEntry*> rootPools;
         for (auto poolItr = _poolMap.begin(); poolItr != _poolMap.end();)
         {
             auto test = const_cast<MapPoolEntry*>(poolItr->second.GetRootPool());
             poolItr->second.rootPool = test;
-            if (workRootPools.find(test) == workRootPools.end())
-                workRootPools.emplace(test);
+            if (rootPools.find(test) == rootPools.end())
+                rootPools.emplace(test);
             ++poolItr;
         }
 
         // Trickle down some values from upper level pools, if unset
-        for (auto poolItr = workRootPools.begin(); poolItr != workRootPools.end();)
+        for (auto poolItr = rootPools.begin(); poolItr != rootPools.end();)
         {
             UpdatePoolDefaults(*poolItr);
             ++poolItr;
@@ -993,35 +993,35 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
 {
     uint32 spawned = 0;
     // Always spawn from top level pool
-    MapPoolEntry* workPool = pool->parentPool ? pool->rootPool : pool;
+    MapPoolEntry* topPool = pool->parentPool ? pool->rootPool : pool;
 
     bool minReached = false;
 
     if (items == 0)
     {
-        items = workPool->GetSpawnable();
+        items = topPool->GetSpawnable();
 
         // Check for pending respawns
         std::vector<RespawnInfo*> ri;
-        TC_LOG_DEBUG("maps.pool", "[Map %u] Spawning pool %u with %u items", ownerMap->GetId(), workPool->poolData.poolId, items);
-        if (ownerMap->GetPoolRespawnInfo(workPool->poolData.poolId, ri))
+        TC_LOG_DEBUG("maps.pool", "[Map %u] Spawning pool %u with %u items", ownerMap->GetId(), topPool->poolData.poolId, items);
+        if (ownerMap->GetPoolRespawnInfo(topPool->poolData.poolId, ri))
         {
             items -= ri.size();
-            TC_LOG_DEBUG("maps.pool", "[Map %u] Adjusting pool %u with %lu pending respawns new count %u", ownerMap->GetId(), workPool->poolData.poolId, ri.size(), items);
+            TC_LOG_DEBUG("maps.pool", "[Map %u] Adjusting pool %u with %lu pending respawns new count %u", ownerMap->GetId(), topPool->poolData.poolId, ri.size(), items);
         }
     }
 
     for (uint32 item = 0; item < items; ++item)
     {
-        if (!minReached && workPool->SpawnSingle(true))
+        if (!minReached && topPool->SpawnSingle(true))
             ++spawned;
         else
             minReached = true;
 
-        if (minReached && workPool->SpawnSingle())
+        if (minReached && topPool->SpawnSingle())
             ++spawned;
     }
-    TC_LOG_DEBUG("maps.pool", "[Map %u] Spawned pool %u with %u items out of %u", ownerMap->GetId(), workPool->poolData.poolId, spawned, items);
+    TC_LOG_DEBUG("maps.pool", "[Map %u] Spawned pool %u with %u items out of %u", ownerMap->GetId(), topPool->poolData.poolId, spawned, items);
     return spawned;
 }
 
