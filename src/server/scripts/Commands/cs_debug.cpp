@@ -81,7 +81,11 @@ public:
         };
         static std::vector<ChatCommand> debugPoolCommandTable =
         {
-            { "dump",          rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolDumpCommand, "" },
+            { "dump",          rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolDumpCommand,    "" },
+            { "respawn",       rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolRespawnCommand, "" },
+            { "despawn",       rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolDespawnCommand, "" },
+            { "reseed",        rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolReseedCommand,  "" },
+            { "list",          rbac::RBAC_PERM_COMMAND_DEBUG,                    true,  &HandleDebugPoolListCommand,    "" },
         };
         static std::vector<ChatCommand> debugCommandTable =
         {
@@ -1877,6 +1881,129 @@ public:
     {
         handler->SendSysMessage("This command does nothing right now. Edit your local core (cs_debug.cpp) to make it do whatever you need for testing.");
         return true;
+    }
+
+    static bool HandleDebugPoolRespawnCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
+        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
+        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
+        if (mapId == -1)
+        {
+            handler->PSendSysMessage("Invalid Map ID %s", mapIdStr);
+            return true;
+        }
+        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
+        if (poolId == -1)
+        {
+            handler->PSendSysMessage("Invalid Pool ID %s", poolIdStr);
+        }
+
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        {
+            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            {
+                uint32 spawns = poolMgr->RespawnPool(poolId);
+                handler->PSendSysMessage("Pool %s respawned %u entities", poolIdStr, spawns);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool HandleDebugPoolDespawnCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
+        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
+        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
+        if (mapId == -1)
+        {
+            handler->PSendSysMessage("Invalid Map ID %s", mapIdStr);
+            return true;
+        }
+        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
+        if (poolId == -1)
+        {
+            handler->PSendSysMessage("Invalid Pool ID %s", poolIdStr);
+        }
+
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        {
+            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            {
+                uint32 spawns = poolMgr->DespawnPool(poolId);
+                handler->PSendSysMessage("Pool %s despawned %u entities", poolIdStr, spawns);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool HandleDebugPoolReseedCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
+        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
+        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
+        if (mapId == -1)
+        {
+            handler->PSendSysMessage("Invalid Map ID %s", mapIdStr);
+            return true;
+        }
+        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
+        if (poolId == -1)
+        {
+            handler->PSendSysMessage("Invalid Pool ID %s", poolIdStr);
+        }
+
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        {
+            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            {
+                uint32 spawns = poolMgr->ReseedPool(poolId);
+                handler->PSendSysMessage("Pool %s reseeded %u entities", poolIdStr, spawns);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool HandleDebugPoolListCommand(ChatHandler* handler, char const* args)
+    {
+        if (!*args)
+            return false;
+
+        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
+        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
+        if (mapId == -1)
+        {
+            handler->PSendSysMessage("Invalid Map ID %s", mapIdStr);
+            return true;
+        }
+
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        {
+            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            {
+                std::vector<MapPoolEntry const*> rootPools = poolMgr->GetRootPools();
+                handler->PSendSysMessage("Listing root pools for map %s", mapIdStr);
+                for (MapPoolEntry const* pool : rootPools)
+                {
+                    MapPoolTemplate const* data = pool->GetPoolData();
+                    handler->PSendSysMessage("Pool %u (%s) Min/Max (%u/%u) Spawned (%u)", data->poolId, data->description.c_str(), data->minLimit, data->maxLimit, pool->GetSpawnCount());
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     static bool HandleDebugPoolDumpCommand(ChatHandler* handler, char const* args)

@@ -151,7 +151,7 @@ private:
     std::unordered_map<PointEntryPair, MapPoolCreatureOverride*> _poolCreatureOverrideMap;
     std::unordered_map<PointEntryPair, MapPoolGameObjectOverride*> _poolGameObjectOverrideMap;
     std::unordered_map<ObjectGuid, CreatureData*> _poolCreatureDataMap;
-    std::unordered_map<ObjectGuid ,GameObjectData*> _poolGameObjectDataMap;
+    std::unordered_map<ObjectGuid, GameObjectData*> _poolGameObjectDataMap;
     void UpdatePoolDefaults(MapPoolEntry* pool);
 
 protected:
@@ -177,6 +177,7 @@ public:
     void SpawnMap();
     MapPoolEntry const* GetPool(uint32 poolId);
     MapPoolEntry const* GetRootPool(uint32 poolId);
+    std::vector<MapPoolEntry const*> GetRootPools();
     uint32 GetRootPoolId(uint32 poolId);
     MapPoolCreatureOverride const* GetCreatureOverride(uint32 pointId, uint32 entry);
     MapPoolGameObjectOverride const* GetGameObjectOverride(uint32 pointId, uint32 entry);
@@ -189,6 +190,9 @@ public:
     static MapPoolGameObject const* GetSpawnGameObject(MapPoolEntry* pool, uint32 entry) { return _getSpawnGameObject(pool, entry); }
     time_t GenerateRespawnTime(WorldObject* obj);
     uint32 SpawnPool(uint32 poolId, uint32 items = 0);
+    uint32 DespawnPool(uint32 poolId);
+    uint32 RespawnPool(uint32 poolId);
+    uint32 ReseedPool(uint32 poolId);
     bool SpawnPendingPoint(MapPoolSpawnPoint* pointId);
     uint32 GetRespawnCounter(uint32 poolId);
     void RegisterRespawn(uint32 poolId);

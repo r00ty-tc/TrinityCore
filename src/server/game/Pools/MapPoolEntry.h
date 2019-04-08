@@ -60,6 +60,7 @@ private:
     bool PerformSpawn(std::vector<MapPoolSpawnPoint*>& spawns);
     void GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree = true);
     MapPoolTemplate poolData;
+    void GetSpawnsRecursive(std::vector<MapPoolSpawnPoint*>& items);
 
 protected:
     uint32 _GetSpawnable(bool minimum, int currentLimit) const;
@@ -102,6 +103,7 @@ public:
     MapPoolEntry const* GetParentPool() const { return parentPool; }
     std::vector<MapPoolEntry*> const* GetChildPools() const { return &childPools; }
     std::vector<MapPoolSpawnPoint*> const* GetSpawns() const { return &spawnList; }
+    std::vector<MapPoolSpawnPoint*> GetSpawnsRecursive();
     std::vector<MapPoolItem*> const* GetItems() const { return &itemList; }
     PoolType GetPoolType() const { return type; }
     float GetChance() const;

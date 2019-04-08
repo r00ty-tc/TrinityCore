@@ -744,6 +744,16 @@ MapPoolEntry const* MapPoolMgr::GetRootPool(uint32 poolId)
     return nullptr;
 }
 
+std::vector<MapPoolEntry const*> MapPoolMgr::GetRootPools()
+{
+    std::vector<MapPoolEntry const*> rootPools;
+    for (auto pool : _poolMap)
+        if (pool.second.parentPool == nullptr)
+            rootPools.push_back(_getPool(pool.second.poolData.poolId));
+
+    return rootPools;
+}
+
 uint32 MapPoolMgr::GetRootPoolId(uint32 poolId)
 {
     if (auto thisPool = GetRootPool(poolId))
@@ -1023,6 +1033,45 @@ uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
     }
     TC_LOG_DEBUG("maps.pool", "[Map %u] Spawned pool %u with %u items out of %u", ownerMap->GetId(), topPool->poolData.poolId, spawned, items);
     return spawned;
+}
+
+uint32 MapPoolMgr::RespawnPool(uint32 poolId)
+{
+    if (MapPoolEntry* pool = _getPool(poolId))
+    {
+        MapPoolEntry* topPool = pool->parentPool ? pool->rootPool : pool;
+        std::vector<RespawnInfo*> ri;
+        if (ownerMap->GetPoolRespawnInfo(topPool->poolData.poolId, ri))
+            ownerMap->RemoveRespawnTime(ri, poolId);
+
+        return SpawnPool(poolId);
+    }
+    return 0;
+}
+
+uint32 MapPoolMgr::DespawnPool(uint32 poolId)
+{
+    uint32 items = 0;
+    if (MapPoolEntry* pool = _getPool(poolId))
+    {
+        for (MapPoolSpawnPoint* spawn : pool->GetSpawnsRecursive())
+        {
+            if (WorldObject* obj = spawn->currentObject)
+            {
+                HandleDespawn(obj);
+                obj->AddObjectToRemoveList();
+                items++;
+            }
+            spawn->currentItem = nullptr;
+        }
+    }
+    return items;
+}
+
+uint32 MapPoolMgr::ReseedPool(uint32 poolId)
+{
+    DespawnPool(poolId);
+    return RespawnPool(poolId);
 }
 
 CreatureData* MapPoolMgr::_getCreatureData(ObjectGuid guid)

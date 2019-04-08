@@ -861,6 +861,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         }
 
         void RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, SQLTransaction dbTrans = nullptr) const;
+        void RemovePoolRespawns(std::vector<RespawnInfo*>& respawnData, uint32 poolId, SQLTransaction dbTrans = nullptr);
 
         SpawnGroupTemplateData const* GetSpawnGroupData(uint32 groupId) const;
 

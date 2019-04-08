@@ -225,3 +225,31 @@ float MapPoolEntry::GetChance() const
 
     return chance;
 }
+
+std::vector<MapPoolSpawnPoint*> MapPoolEntry::GetSpawnsRecursive()
+{
+    if (parentPool != nullptr)
+    {
+        return rootPool->GetSpawnsRecursive();
+    }
+    else
+    {
+        std::vector<MapPoolSpawnPoint*> items;
+        GetSpawnsRecursive(items);
+        return items;
+    }
+}
+
+void MapPoolEntry::GetSpawnsRecursive(std::vector<MapPoolSpawnPoint*>& items)
+{
+    for (MapPoolSpawnPoint* point : spawnList)
+    {
+        // Spawnpoints can be assigned to multiple pools. Only return unique ones.
+        std::vector<MapPoolSpawnPoint*>::const_iterator it = std::find(items.begin(), items.end(), point);
+        if (it == items.end())
+            items.push_back(point);
+    }
+
+    for (MapPoolEntry* pool : childPools)
+        pool->GetSpawnsRecursive(items);
+}

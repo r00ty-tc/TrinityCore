@@ -3270,6 +3270,18 @@ void Map::RemoveRespawnTime(RespawnVector& respawnData, bool doRespawn, SQLTrans
         CharacterDatabase.CommitTransaction(trans);
 }
 
+void Map::RemovePoolRespawns(std::vector<RespawnInfo*>& respawnData, uint32 poolId, SQLTransaction dbTrans)
+{
+    SQLTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
+    for (RespawnInfo* info : respawnData)
+    {
+        if (info->poolId == poolId)
+            RemoveRespawnTime(info, false, trans);
+    }
+    if (!dbTrans)
+        CharacterDatabase.CommitTransaction(trans);
+}
+
 void Map::ProcessRespawns()
 {
     time_t now = GameTime::GetGameTime();
