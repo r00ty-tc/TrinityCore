@@ -124,7 +124,6 @@ public:
             { "pool",          rbac::RBAC_PERM_COMMAND_DEBUG,               true,  nullptr,                             "", debugPoolCommandTable },
             { "dummy",         rbac::RBAC_PERM_COMMAND_DEBUG_DUMMY,         false, &HandleDebugDummyCommand,            "" },
             { "asan",          rbac::RBAC_PERM_COMMAND_DEBUG_ASAN,          true,  nullptr,                             "", debugAsanCommandTable },
-            { "poolspawn",     rbac::RBAC_PERM_COMMAND_DEBUG,               false, &HandleDebugPoolSpawn,               "" },
         };
         static std::vector<ChatCommand> commandTable =
         {
