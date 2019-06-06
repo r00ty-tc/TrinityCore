@@ -258,3 +258,20 @@ void MapPoolEntry::GetSpawnsRecursive(std::vector<MapPoolSpawnPoint*>& items)
     for (MapPoolEntry* pool : childPools)
         pool->GetSpawnsRecursive(items);
 }
+
+void MapPoolEntry::SetActive(bool active)
+{
+    if (activePool == active)
+        return;
+
+    if (active)
+    {
+        activePool = true;
+        ownerManager->SpawnPool(GetRootPoolId());
+    }
+    else
+    {
+        ownerManager->DespawnPool(GetRootPoolId());
+        activePool = false;
+    }
+}

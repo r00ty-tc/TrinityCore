@@ -15,6 +15,7 @@ CREATE TABLE `mappool_template`
   `spawntimeSecsFast` int(10) unsigned NOT NULL DEFAULT '0',
   `corpsetimeSecsLoot` int(10) unsigned NOT NULL DEFAULT '0',
   `corpsetimeSecsNoLoot` int(10) unsigned NOT NULL DEFAULT '0',
+  `poolFlags` int(10) unsigned NOT NULL DEFAULT '0',
   `description` varchar(255) NULL,
   PRIMARY KEY (`map`, `poolId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Template';

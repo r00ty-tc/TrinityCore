@@ -33,6 +33,13 @@ enum PoolType
     POOLTYPE_MAX
 };
 
+enum PoolFlags
+{
+    POOL_FLAG_NONE           = 0x00,
+    POOL_FLAG_MANUAL_SPAWN   = 0x01,
+    POOL_FLAGS_ALL = (POOL_FLAG_MANUAL_SPAWN)
+};
+
 struct MapPoolTemplate
 {
     uint32 mapId;
@@ -49,6 +56,7 @@ struct MapPoolTemplate
     uint32 corpsetimeSecsLoot;
     uint32 corpsetimeSecsNoLoot;
     std::string description;
+    PoolFlags flags;
 };
 
 class MapPoolEntry
@@ -61,6 +69,7 @@ private:
     void GetSpawnList(std::vector<MapPoolSpawnPoint*>& pointList, bool onlyFree = true);
     MapPoolTemplate poolData;
     void GetSpawnsRecursive(std::vector<MapPoolSpawnPoint*>& items);
+    bool activePool;
 
 protected:
     uint32 _GetSpawnable(bool minimum, int currentLimit) const;
@@ -85,6 +94,7 @@ public:
         spawnsThisPool = 0;
         chance = 0.0f;
         respawnCounter = 1;
+        activePool = false;
     }
 
     // Checks if poolId is anywhere in the hierarchy already
@@ -107,5 +117,7 @@ public:
     std::vector<MapPoolItem*> const* GetItems() const { return &itemList; }
     PoolType GetPoolType() const { return type; }
     float GetChance() const;
+    void SetActive(bool active);
+    bool isActive() { return activePool; }
 };
 #endif

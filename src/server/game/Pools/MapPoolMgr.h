@@ -169,6 +169,7 @@ protected:
     bool SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId);
     bool SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
     uint32 SpawnPool(MapPoolEntry* pool, uint32 items = 0);
+    void SetActive(MapPoolEntry* pool, bool active);
 
 public:
     MapPoolMgr(Map* map);
@@ -196,6 +197,7 @@ public:
     bool SpawnPendingPoint(MapPoolSpawnPoint* pointId);
     uint32 GetRespawnCounter(uint32 poolId);
     void RegisterRespawn(uint32 poolId);
+    void SetActive(uint32 poolId, bool active);
 };
 
 #endif

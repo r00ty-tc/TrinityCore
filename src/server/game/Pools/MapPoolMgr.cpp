@@ -95,8 +95,8 @@ void MapPoolMgr::LoadMapPools()
     // Read Pool Templates
     //        0       1          2          3         4         5         6             7          8                 9
     // SELECT poolId, poolType, phaseMask, spawnMask, minLimit, maxLimit, MovementType, spawnDist, spawntimeSecsMin, spawntimeSecsMax, 
-    //        10                 11                  12                    13
-    //        spawntimeSecsFast, corpsetimeSecsLoot, corpsetimeSecsNoLoot, description FROM mappool_template WHERE map = ?
+    //        10                 11                  12                    13         14
+    //        spawntimeSecsFast, corpsetimeSecsLoot, corpsetimeSecsNoLoot, poolFlags, description FROM mappool_template WHERE map = ?
     PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_TEMPLATE);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
@@ -141,7 +141,8 @@ void MapPoolMgr::LoadMapPools()
             thisTemplate.spawntimeSecsFast = fields[10].GetUInt32();
             thisTemplate.corpsetimeSecsLoot = fields[11].GetUInt32();
             thisTemplate.corpsetimeSecsNoLoot = fields[12].GetUInt32();
-            thisTemplate.description = fields[13].GetString();
+            thisTemplate.flags = static_cast<PoolFlags>(fields[13].GetUInt32());
+            thisTemplate.description = fields[14].GetString();
 
             // Populate pool base values and initialize pool
             thisPool->type = static_cast<PoolType>(fields[1].GetUInt8());
@@ -149,6 +150,7 @@ void MapPoolMgr::LoadMapPools()
             thisPool->rootPool = nullptr;
             thisPool->childPools.clear();
             thisPool->spawnList.clear();
+            thisPool->activePool = (thisTemplate.flags & PoolFlags::POOL_FLAG_MANUAL_SPAWN) == 0    ;
             thisPool->SetOwnerPoolMgr(this);
             ++pools;
         } while (result->NextRow());
@@ -1019,6 +1021,9 @@ uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
 
 uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
 {
+    if (!pool->isActive())
+        return 0;
+
     uint32 spawned = 0;
     // Always spawn from top level pool
     MapPoolEntry* topPool = pool->parentPool ? pool->rootPool : pool;
@@ -1424,4 +1429,15 @@ void MapPoolMgr::UpdatePoolDefaults(MapPoolEntry* pool)
     {
         UpdatePoolDefaults(nextPool);
     }
+}
+
+void MapPoolMgr::SetActive(uint32 poolId, bool active)
+{
+    if (MapPoolEntry* pool = _getPool(poolId))
+        SetActive(pool, active);
+}
+
+void MapPoolMgr::SetActive(MapPoolEntry* pool, bool active)
+{
+    pool->SetActive(active);
 }
