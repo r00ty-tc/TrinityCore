@@ -271,6 +271,9 @@ void MapPoolEntry::SetActive(bool active)
     }
     else
     {
+        // Clear any lingering respawn times for this pool
+        ownerManager->ClearRespawnTimes(GetRootPoolId());
+
         ownerManager->DespawnPool(GetRootPoolId());
         activePool = false;
     }

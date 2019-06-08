@@ -170,6 +170,7 @@ protected:
     bool SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId);
     uint32 SpawnPool(MapPoolEntry* pool, uint32 items = 0);
     void SetActive(MapPoolEntry* pool, bool active);
+    void ClearRespawnTimes(MapPoolEntry* pool);
 
 public:
     MapPoolMgr(Map* map);
@@ -191,13 +192,14 @@ public:
     static MapPoolGameObject const* GetSpawnGameObject(MapPoolEntry* pool, uint32 entry) { return _getSpawnGameObject(pool, entry); }
     time_t GenerateRespawnTime(WorldObject* obj);
     uint32 SpawnPool(uint32 poolId, uint32 items = 0);
-    uint32 DespawnPool(uint32 poolId);
+    uint32 DespawnPool(uint32 poolId, bool includeCorpse = false);
     uint32 RespawnPool(uint32 poolId);
     uint32 ReseedPool(uint32 poolId);
     bool SpawnPendingPoint(MapPoolSpawnPoint* pointId);
     uint32 GetRespawnCounter(uint32 poolId);
     void RegisterRespawn(uint32 poolId);
     void SetActive(uint32 poolId, bool active);
+    void ClearRespawnTimes(uint32 poolId);
 };
 
 #endif

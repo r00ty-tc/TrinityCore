@@ -1062,21 +1062,39 @@ uint32 MapPoolMgr::RespawnPool(uint32 poolId)
 {
     if (MapPoolEntry* pool = _getPool(poolId))
     {
-        MapPoolEntry* topPool = pool->parentPool ? pool->rootPool : pool;
-        std::vector<RespawnInfo*> ri;
-        if (ownerMap->GetPoolRespawnInfo(topPool->poolData.poolId, ri))
-            ownerMap->RemoveRespawnTime(ri, poolId);
+        // Assure root pool
+        if (pool->rootPool)
+            pool = pool->rootPool;
 
-        return SpawnPool(poolId);
+        ClearRespawnTimes(pool);
+        return SpawnPool(pool->poolData.poolId);
     }
     return 0;
 }
 
-uint32 MapPoolMgr::DespawnPool(uint32 poolId)
+void MapPoolMgr::ClearRespawnTimes(uint32 poolId)
+{
+    if (MapPoolEntry* pool = _getPool(poolId))
+        ClearRespawnTimes(pool);
+}
+
+void MapPoolMgr::ClearRespawnTimes(MapPoolEntry* pool)
+{
+    MapPoolEntry* topPool = pool->parentPool ? pool->rootPool : pool;
+    std::vector<RespawnInfo*> ri;
+    if (ownerMap->GetPoolRespawnInfo(topPool->poolData.poolId, ri))
+        ownerMap->RemoveRespawnTime(ri, pool->poolData.poolId);
+}
+
+uint32 MapPoolMgr::DespawnPool(uint32 poolId, bool includeCorpse /* = false */)
 {
     uint32 items = 0;
     if (MapPoolEntry* pool = _getPool(poolId))
     {
+        // Assure root pool
+        if (pool->rootPool)
+            pool = pool->rootPool;
+
         for (MapPoolSpawnPoint* spawn : pool->GetSpawnsRecursive())
         {
             if (WorldObject* obj = spawn->currentObject)
@@ -1086,6 +1104,17 @@ uint32 MapPoolMgr::DespawnPool(uint32 poolId)
             }
             if (spawn->currentObject == nullptr)
                 spawn->currentItem = nullptr;
+
+            if (includeCorpse)
+            {
+                // If including corpses, remove them here
+                // Need to store in new list, since cleanup from removing object will adjust oldObjects vector
+                std::vector<WorldObject*> workObjList = std::vector<WorldObject*>(spawn->oldObjects);
+                for (WorldObject* oldObj : workObjList)
+                    oldObj->AddObjectToRemoveList();
+
+                spawn->oldObjects.clear();
+            }
         }
     }
     return items;
