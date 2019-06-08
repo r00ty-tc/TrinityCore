@@ -146,6 +146,15 @@ CREATE TABLE `mappool_creature_override`
   PRIMARY KEY (`map`, `poolId`, `entry`, `pointId`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Pool Creature Override Data';
 
+DROP TABLE IF EXISTS `game_event_mappool`;
+CREATE TABLE `game_event_mappool`
+(
+  `map` smallint(5) unsigned NOT NULL DEFAULT '0',
+  `eventEntry` tinyint(4) unsigned NOT NULL,
+  `poolId` mediumint(8) unsigned NOT NULL,
+  PRIMARY KEY (`map`, `eventEntry`, `poolId`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Game Event Pool Entries';
+
 DELETE FROM `trinity_string`
 WHERE entry BETWEEN 5084 AND 5099;
 

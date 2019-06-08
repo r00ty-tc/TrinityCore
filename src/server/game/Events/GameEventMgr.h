@@ -152,8 +152,10 @@ class TC_GAME_API GameEventMgr
 
         typedef std::list<ObjectGuid::LowType> GuidList;
         typedef std::list<uint32> IdList;
+        typedef std::list<std::pair<uint32, uint32>> GameEventMapPool;
         typedef std::vector<GuidList> GameEventGuidMap;
         typedef std::vector<IdList> GameEventIdMap;
+        typedef std::vector<GameEventMapPool> GameEventPoolMap;
         typedef std::pair<ObjectGuid::LowType, ModelEquip> ModelEquipPair;
         typedef std::list<ModelEquipPair> ModelEquipList;
         typedef std::vector<ModelEquipList> GameEventModelEquipMap;
@@ -174,6 +176,7 @@ class TC_GAME_API GameEventMgr
         //GameEventGuidMap  mGameEventCreatureGuids;
         //GameEventGuidMap  mGameEventGameobjectGuids;
         GameEventIdMap    mGameEventPoolIds;
+        GameEventPoolMap  mGameEventMapPoolIds;
         GameEventDataMap  mGameEvent;
         GameEventBitmask  mGameEventBattlegroundHolidays;
         QuestIdToEventConditionMap mQuestToEventConditions;
