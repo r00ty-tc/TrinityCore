@@ -1,16 +1,16 @@
 -- Add RBAC for Pooling
 DELETE FROM `rbac_permissions`
-WHERE `id` BETWEEN 875 AND 880;
+WHERE `id` BETWEEN 884 AND 889;
 
 INSERT INTO `rbac_permissions`
 (`id`, `name`)
 VALUES
-(880, 'Command: pool'),
-(881, 'Command: pool dump'),
-(882, 'Command: pool respawn'),
-(883, 'Command: pool despawn'),
-(884, 'Command: pool reseed'),
-(885, 'Command: pool list');
+(884, 'Command: pool'),
+(885, 'Command: pool dump'),
+(886, 'Command: pool respawn'),
+(887, 'Command: pool despawn'),
+(888, 'Command: pool reseed'),
+(889, 'Command: pool list');
 
 DELETE FROM `rbac_linked_permissions`
 WHERE `linkedId` BETWEEN 875 AND 880;
@@ -19,9 +19,9 @@ WHERE `linkedId` BETWEEN 875 AND 880;
 INSERT INTO `rbac_linked_permissions`
 (`id`, `linkedId`)
 VALUES
-(197, 880),
-(197, 881),
-(196, 882),
-(196, 883),
-(196, 884),
-(197, 885);
+(197, 884),
+(197, 885),
+(196, 886),
+(196, 887),
+(196, 888),
+(197, 889);

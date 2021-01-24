@@ -16,19 +16,21 @@
 * with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "DatabaseEnv.h"
-#include "MapPoolMgr.h"
-#include "MapPoolEntry.h"
-#include "Log.h"
-#include "ObjectMgr.h"
-#include <boost/container/flat_set.hpp>
 #include <Creature.h>
 #include "CreatureData.h"
+#include "DatabaseEnv.h"
 #include <GameObject.h>
 #include "GameObjectData.h"
+#include "Log.h"
+#include "MapPoolMgr.h"
+#include "MapPoolEntry.h"
+#include "ObjectMgr.h"
 #include "SpellMgr.h"
 #include "SpellInfo.h"
+#include "StringConvert.h"
 #include "Random.h"
+#include "Util.h"
+#include <boost/container/flat_set.hpp>
 
 MapPoolMgr::MapPoolMgr(Map* map)
 {
@@ -60,17 +62,15 @@ MapPoolMgr::~MapPoolMgr()
         _poolGameObjectOverrideMap.clear();
 
         // Delete all items (Creatures/GOs)
-        for (auto item : mapResult.second.itemList)
+        for (auto* item : mapResult.second.itemList)
         {
-            if (auto creature = item->ToCreatureItem())
+            if (auto* creature = item->ToCreatureItem())
             {
-                if (creature->overrideData)
-                    delete creature->overrideData;
+                delete creature->overrideData;
             }
-            else if (auto go = item->ToGameObjectItem())
+            else if (auto* go = item->ToGameObjectItem())
             {
-                if (go->overrideData)
-                    delete go->overrideData;
+                delete go->overrideData;
             }
             delete item;
         }
@@ -94,10 +94,10 @@ void MapPoolMgr::LoadMapPools()
 
     // Read Pool Templates
     //        0       1          2          3         4         5         6             7          8                 9
-    // SELECT poolId, poolType, phaseMask, spawnMask, minLimit, maxLimit, MovementType, spawnDist, spawntimeSecsMin, spawntimeSecsMax, 
+    // SELECT poolId, poolType, phaseMask, spawnMask, minLimit, maxLimit, MovementType, wander_distance, spawntimeSecsMin, spawntimeSecsMax, 
     //        10                 11                  12                    13         14
     //        spawntimeSecsFast, corpsetimeSecsLoot, corpsetimeSecsNoLoot, poolFlags, description FROM mappool_template WHERE map = ?
-    PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_TEMPLATE);
+    WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_TEMPLATE);
     stmt->setUInt32(0, ownerMapId);
     if (PreparedQueryResult result = WorldDatabase.Query(stmt))
     {
@@ -199,7 +199,7 @@ void MapPoolMgr::LoadMapPools()
         std::set<MapPoolEntry*> rootPools;
         for (auto poolItr = _poolMap.begin(); poolItr != _poolMap.end();)
         {
-            auto test = const_cast<MapPoolEntry*>(poolItr->second.GetRootPool());
+            auto* test = const_cast<MapPoolEntry*>(poolItr->second.GetRootPool());
             poolItr->second.rootPool = test;
             if (rootPools.find(test) == rootPools.end())
                 rootPools.emplace(test);
@@ -270,7 +270,7 @@ void MapPoolMgr::LoadMapPools()
             {
                 // Fail if adding entries to a pool with children
                 // Only botton level pools can have entries, upper/mid level pools are for organization of pools
-                if (thisPool->childPools.size() != 0)
+                if (!thisPool->childPools.empty())
                 {
                     TC_LOG_FATAL("server.loading", "[Map %u] Attempt to add creature info to pool %u with children", ownerMapId, poolId);
                     ABORT();
@@ -306,7 +306,7 @@ void MapPoolMgr::LoadMapPools()
                 }
 
                 // Create new info/populate
-                MapPoolCreature* thisInfo = new MapPoolCreature();
+                auto* thisInfo = new MapPoolCreature();
                 thisInfo->mapId = ownerMapId;
                 thisInfo->poolId = poolId;
                 thisInfo->entry = fields[1].GetUInt32();
@@ -348,7 +348,7 @@ void MapPoolMgr::LoadMapPools()
             {
                 // Fail if adding entries to a pool with children
                 // Only botton level pools can have entries, upper/mid level pools are for organization of pools
-                if (thisPool->childPools.size() != 0)
+                if (!thisPool->childPools.empty())
                 {
                     TC_LOG_FATAL("server.loading", "[Map %u] Attempt to add gameobject info to pool %u with children", ownerMapId, poolId);
                     ABORT();
@@ -387,7 +387,7 @@ void MapPoolMgr::LoadMapPools()
                 // SELECT poolId, entry, chance, animProgress, state FROM mappool_gameobject WHERE map = ?
 
                 // Create new info/populate
-                MapPoolGameObject* thisInfo = new MapPoolGameObject();
+                auto* thisInfo = new MapPoolGameObject();
                 thisInfo->mapId = ownerMapId;
                 thisInfo->poolId = poolId;
                 thisInfo->entry = fields[1].GetUInt32();
@@ -410,7 +410,7 @@ void MapPoolMgr::LoadMapPools()
     //        0       1      2        3        4            5                6          7        8        9          10
     // SELECT poolId, entry, pointId, modelId, equipmentId, currentWaypoint, curHealth, curMana, npcFlag, unitFlags, dynamicFlags, 
     //        11            12         13         14         15                16                17                  18
-    //        MovementType, spawnDist, phaseMask, spawnMask, spawntimeSecsMin, spawntimeSecsMax, corpsetimeSecsLoot, corpsetimeSecsNoLoot, 
+    //        MovementType, wander_distance, phaseMask, spawnMask, spawntimeSecsMin, spawntimeSecsMax, corpsetimeSecsLoot, corpsetimeSecsNoLoot, 
     //        19       20     21      22      23     24     25      26
     //        path_id, mount, bytes1, bytes2, emote, auras, AIName, ScriptName FROM mappool_creature_override WHERE map = ?
     stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_MAPPOOL_CREATURE_OVERRIDE);
@@ -439,7 +439,7 @@ void MapPoolMgr::LoadMapPools()
                 continue;
             }
 
-            MapPoolCreatureOverride* override = new MapPoolCreatureOverride();
+            auto* override = new MapPoolCreatureOverride();
             override->modelId = fields[3].GetUInt32();
             override->equipmentId = fields[4].GetUInt8();
             override->currentWaypoint = fields[5].GetUInt32();
@@ -449,7 +449,7 @@ void MapPoolMgr::LoadMapPools()
             override->unitFlags = fields[9].GetUInt32();
             override->dynamicFlags = fields[10].GetUInt32();
             override->movementType = fields[11].GetUInt8();
-            override->spawnDist = fields[12].GetFloat();
+            override->wander_distance = fields[12].GetFloat();
             override->spawntimeSecsMin = fields[15].GetUInt32();
             override->spawntimeSecsMax = fields[16].GetUInt32();
             override->corpsetimeSecsLoot = fields[17].GetUInt32();
@@ -464,35 +464,40 @@ void MapPoolMgr::LoadMapPools()
             override->aiName = fields[25].GetString();
             override->scriptName = fields[26].GetString();
 
-            Tokenizer tokens(fields[24].GetString(), ' ');
+            std::vector<std::string_view> tokens = Trinity::Tokenize(fields[24].GetStringView(), ' ', false);
             uint8 i = 0;
             override->auras.resize(tokens.size());
-            for (Tokenizer::const_iterator itr = tokens.begin(); itr != tokens.end(); ++itr)
+            for (auto& token : tokens)
             {
-                SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(atoul(*itr));
+                //SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(atoul(*itr));
+                Optional<uint32> spellId = Trinity::StringTo<uint32>(token);
+                if (!spellId.has_value())
+                    continue;
+
+                SpellInfo const* AdditionalSpellInfo = sSpellMgr->GetSpellInfo(spellId.value());
                 if (!AdditionalSpellInfo)
                 {
-                    TC_LOG_ERROR("server.loading", "[Map %u] Creature (Entry: %u) has wrong spell %lu defined for pool %u", ownerMapId, entry, atoul(*itr), poolId);
+                    TC_LOG_ERROR("server.loading", "[Map %u] Creature (Entry: %u) has wrong spell %u defined for pool %u", ownerMapId, entry, spellId.value(), poolId);
                     continue;
                 }
 
                 if (AdditionalSpellInfo->HasAura(SPELL_AURA_CONTROL_VEHICLE))
-                    TC_LOG_ERROR("server.loading", "[Map %u] Creature (Entry: %u) has SPELL_AURA_CONTROL_VEHICLE aura %lu defined for pool %u.", ownerMapId, entry, atoul(*itr), poolId);
+                    TC_LOG_ERROR("server.loading", "[Map %u] Creature (Entry: %u) has SPELL_AURA_CONTROL_VEHICLE aura %u defined for pool %u.", ownerMapId, entry, spellId.value(), poolId);
 
-                if (std::find(override->auras.begin(), override->auras.end(), atoul(*itr)) != override->auras.end())
+                if (std::find(override->auras.begin(), override->auras.end(), spellId.value()) != override->auras.end())
                 {
-                    TC_LOG_ERROR("server.loading", "[Map %u] Creature (Entry: %u) has duplicate aura (spell %lu) in pool %u.", ownerMapId, entry, atoul(*itr), poolId);
+                    TC_LOG_ERROR("server.loading", "[Map %u] Creature (Entry: %u) has duplicate aura (spell %u) in pool %u.", ownerMapId, entry, spellId.value(), poolId);
                     continue;
                 }
 
-                override->auras[i++] = atoul(*itr);
+                override->auras[i++] = spellId.value();
             }
 
 
             if (pointId == 0)
             {
                 MapPoolCreature* thisItem = nullptr;
-                for (auto itr : poolData->itemList)
+                for (auto* itr : poolData->itemList)
                 {
                     if (itr->entry == entry)
                     {
@@ -513,7 +518,7 @@ void MapPoolMgr::LoadMapPools()
             else if (entry == 0)
             {
                 MapPoolSpawnPoint* thisPoint = nullptr;
-                for (auto itr : poolData->spawnList)
+                for (auto* itr : poolData->spawnList)
                 {
                     if (itr->pointId == pointId)
                     {
@@ -586,7 +591,7 @@ void MapPoolMgr::LoadMapPools()
                 continue;
             }
 
-            MapPoolGameObjectOverride* override = new MapPoolGameObjectOverride();
+            auto* override = new MapPoolGameObjectOverride();
             override->animProgress = fields[3].GetUInt8();
             override->state = fields[4].GetUInt8();
             override->phaseMask = fields[5].GetUInt32();
@@ -605,7 +610,7 @@ void MapPoolMgr::LoadMapPools()
             if (entry != 0)
             {
                 MapPoolGameObject* thisItem = nullptr;
-                for (auto itr : poolData->itemList)
+                for (auto* itr : poolData->itemList)
                 {
                     if (itr->entry == entry)
                     {
@@ -626,7 +631,7 @@ void MapPoolMgr::LoadMapPools()
             else if (pointId != 0)
             {
                 MapPoolSpawnPoint* thisPoint = nullptr;
-                for (auto itr : poolData->spawnList)
+                for (auto* itr : poolData->spawnList)
                 {
                     if (itr->pointId == pointId)
                     {
@@ -647,17 +652,14 @@ void MapPoolMgr::LoadMapPools()
             else
             {
                 // Check point and entry are valid
-                MapPoolSpawnPoint* point = ownerMap->GetSpawnPoint(pointId);
-                if (!point)
+                if (ownerMap->GetSpawnPoint(pointId) != nullptr)
                 {
                     TC_LOG_ERROR("server.loading", "[Map %u] Spawn point %u not found when adding spawn point for GameObject entry %u to map", ownerMapId, pointId, entry);
                     delete override;
                     continue;
                 }
 
-                GameObjectTemplate const* cTemp = sObjectMgr->GetGameObjectTemplate(entry);
-
-                if (!cTemp)
+                if (sObjectMgr->GetGameObjectTemplate(entry) != nullptr)
                 {
                     TC_LOG_ERROR("server.loading", "[Map %u] GameObject Template for entry %u not found when adding spawn point for point %u to map", ownerMapId, entry, pointId);
                     delete override;
@@ -674,9 +676,9 @@ void MapPoolMgr::LoadMapPools()
 void MapPoolMgr::SpawnMap()
 {
     // Spawn map after initial load
-    for (auto itr = _poolMap.begin(); itr != _poolMap.end(); ++itr)
+    for (auto& itr : _poolMap)
     {
-        MapPoolEntry* pool = &itr->second;
+        MapPoolEntry* pool = &itr.second;
         // Only process top level pools
         if (!pool->parentPool)
             SpawnPool(pool);
@@ -694,14 +696,14 @@ MapPoolEntry* MapPoolMgr::_getPool(uint32 poolId)
 
 MapPoolSpawnPoint* MapPoolMgr::_getSpawnPoint(MapPoolEntry const* pool, uint32 pointId)
 {
-    std::vector<MapPoolSpawnPoint*>::const_iterator spawnItr = std::find_if(pool->spawnList.begin(), pool->spawnList.end(), [pointId](std::vector<MapPoolSpawnPoint*>::value_type const& spawns)
+    const auto spawnItr = std::find_if(pool->spawnList.begin(), pool->spawnList.end(), [pointId](std::vector<MapPoolSpawnPoint*>::value_type const& spawns)
     {
         return (spawns->pointId == pointId);
     });
 
     if (spawnItr == pool->spawnList.end() && !pool->parentPool)
         return nullptr;
-    else if (spawnItr == pool->spawnList.end())
+    if (spawnItr == pool->spawnList.end())
         return _getSpawnPoint(pool->parentPool, pointId);
 
     return *spawnItr;
@@ -709,7 +711,7 @@ MapPoolSpawnPoint* MapPoolMgr::_getSpawnPoint(MapPoolEntry const* pool, uint32 p
 
 MapPoolCreature* MapPoolMgr::_getSpawnCreature(MapPoolEntry const* pool, uint32 entry)
 {
-    std::vector<MapPoolItem*>::const_iterator entryItr = std::find_if(pool->itemList.begin(), pool->itemList.end(), [entry](std::vector<MapPoolItem*>::value_type const& item)
+    const auto entryItr = std::find_if(pool->itemList.begin(), pool->itemList.end(), [entry](std::vector<MapPoolItem*>::value_type const& item)
     {
         return (item->entry == entry);
     });
@@ -722,7 +724,7 @@ MapPoolCreature* MapPoolMgr::_getSpawnCreature(MapPoolEntry const* pool, uint32 
 
 MapPoolGameObject* MapPoolMgr::_getSpawnGameObject(MapPoolEntry* pool, uint32 entry)
 {
-    std::vector<MapPoolItem*>::const_iterator entryItr = std::find_if(pool->itemList.begin(), pool->itemList.end(), [entry](std::vector<MapPoolItem*>::value_type const& item)
+    const std::vector<MapPoolItem*>::const_iterator entryItr = std::find_if(pool->itemList.begin(), pool->itemList.end(), [entry](std::vector<MapPoolItem*>::value_type const& item)
     {
         return (item->entry == entry);
     });
@@ -740,7 +742,7 @@ MapPoolEntry const* MapPoolMgr::GetPool(uint32 poolId)
 
 MapPoolEntry const* MapPoolMgr::GetRootPool(uint32 poolId)
 {
-    if (auto thisPool = _getPool(poolId))
+    if (auto* thisPool = _getPool(poolId))
         return (thisPool->parentPool ? thisPool->rootPool : thisPool);
 
     return nullptr;
@@ -749,7 +751,7 @@ MapPoolEntry const* MapPoolMgr::GetRootPool(uint32 poolId)
 std::vector<MapPoolEntry const*> MapPoolMgr::GetRootPools()
 {
     std::vector<MapPoolEntry const*> rootPools;
-    for (auto pool : _poolMap)
+    for (const auto pool : _poolMap)
         if (pool.second.parentPool == nullptr)
             rootPools.push_back(_getPool(pool.second.poolData.poolId));
 
@@ -758,7 +760,7 @@ std::vector<MapPoolEntry const*> MapPoolMgr::GetRootPools()
 
 uint32 MapPoolMgr::GetRootPoolId(uint32 poolId)
 {
-    if (auto thisPool = GetRootPool(poolId))
+    if (const auto* thisPool = GetRootPool(poolId))
         return thisPool->poolData.poolId;
 
     return 0;
@@ -766,7 +768,7 @@ uint32 MapPoolMgr::GetRootPoolId(uint32 poolId)
 
 MapPoolCreatureOverride* MapPoolMgr::_getCreatureOverride(uint32 pointId, uint32 entry)
 {
-    auto override = _poolCreatureOverrideMap.find(PointEntryPair(pointId, entry));
+    const auto override = _poolCreatureOverrideMap.find(PointEntryPair(pointId, entry));
     if (override == _poolCreatureOverrideMap.end())
         return nullptr;
 
@@ -775,7 +777,7 @@ MapPoolCreatureOverride* MapPoolMgr::_getCreatureOverride(uint32 pointId, uint32
 
 MapPoolGameObjectOverride* MapPoolMgr::_getGameObjectOverride(uint32 pointId, uint32 entry)
 {
-    auto override = _poolGameObjectOverrideMap.find(PointEntryPair(pointId, entry));
+    const auto override = _poolGameObjectOverrideMap.find(PointEntryPair(pointId, entry));
     if (override == _poolGameObjectOverrideMap.end())
         return nullptr;
 
@@ -816,7 +818,7 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
                 // Get real spawnpoint
                 MapPoolSpawnPoint* point = _getSpawnPoint(pool, spawnPoint->pointId);
                 ObjectGuid const guid = obj->GetGUID();
-                std::vector<WorldObject*>::iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [guid](std::vector<WorldObject*>::value_type const& item)
+                const auto itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [guid](std::vector<WorldObject*>::value_type const& item)
                 {
                     return (item->GetGUID() == guid);
                 });
@@ -878,7 +880,7 @@ void MapPoolMgr::HandleDespawn(WorldObject* obj, bool unloadingGrid)
 
                     // Handle expedited spawns
                     MapPoolEntry* rootPool = realPool->parentPool ? realPool->rootPool : realPool;
-                    uint32 spawnsNeeded = rootPool->GetSpawnable(true);
+                    const uint32 spawnsNeeded = rootPool->GetSpawnable(true);
                     if (spawnsNeeded > 0)
                     {
                         if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(rootPool->poolData.poolId))
@@ -909,7 +911,7 @@ void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
             if (point->currentObject && point->currentObject->GetGUID() == obj->GetGUID())
             {
                 // Add to old objects and unlink this spawnpoint
-                std::vector<WorldObject*>::const_iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [obj](std::vector<WorldObject*>::value_type const& item)
+                const std::vector<WorldObject*>::const_iterator itr = std::find_if(point->oldObjects.begin(), point->oldObjects.end(), [obj](std::vector<WorldObject*>::value_type const& item)
                 {
                     return obj->GetGUID() == item->GetGUID();
                 });
@@ -929,7 +931,7 @@ void MapPoolMgr::HandleDeath(Creature* obj, bool unloadingGrid)
 
                 // Handle expedited spawns
                 MapPoolEntry* rootPool = realPool->parentPool ? realPool->rootPool : realPool;
-                uint32 spawnsNeeded = rootPool->GetSpawnable(true);
+                const uint32 spawnsNeeded = rootPool->GetSpawnable(true);
                 if (spawnsNeeded > 0)
                 {
                     if (RespawnInfo* info = ownerMap->GetFirstPoolRespawn(rootPool->poolData.poolId))
@@ -968,13 +970,13 @@ time_t MapPoolMgr::GenerateRespawnTime(WorldObject* obj)
     }
     else
     {
-        return time_t(0);
+        return static_cast<time_t>(0);
     }
 
 
     // If we don't have all these things, it's not a valid pool creature
     if (!pool || !spawnPoint || (!cEntry && !goEntry))
-        return time_t(0);
+        return static_cast<time_t>(0);
 
     // Check for specific override for this combination
     if (MapPoolCreatureOverride* override = _getCreatureOverride(spawnPoint->pointId, obj->GetEntry()))
@@ -1008,7 +1010,7 @@ time_t MapPoolMgr::GenerateRespawnTime(WorldObject* obj)
         return static_cast<time_t>(urand(pool->poolData.spawntimeSecsMin, pool->poolData.spawntimeSecsMax));
 
     // If we make it here, we don't have anything
-    return time_t(0);
+    return static_cast<time_t>(0);
 }
 
 uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
@@ -1019,7 +1021,7 @@ uint32 MapPoolMgr::SpawnPool(uint32 poolId, uint32 items)
     return 0;
 }
 
-uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items)
+uint32 MapPoolMgr::SpawnPool(MapPoolEntry* pool, uint32 items) const
 {
     if (!pool->isActive())
         return 0;
@@ -1078,7 +1080,7 @@ void MapPoolMgr::ClearRespawnTimes(uint32 poolId)
         ClearRespawnTimes(pool);
 }
 
-void MapPoolMgr::ClearRespawnTimes(MapPoolEntry* pool)
+void MapPoolMgr::ClearRespawnTimes(MapPoolEntry* pool) const
 {
     MapPoolEntry* topPool = pool->parentPool ? pool->rootPool : pool;
     std::vector<RespawnInfo*> ri;
@@ -1128,7 +1130,7 @@ uint32 MapPoolMgr::ReseedPool(uint32 poolId)
 
 CreatureData* MapPoolMgr::_getCreatureData(ObjectGuid guid)
 {
-    auto itr = _poolCreatureDataMap.find(guid);
+    const auto itr = _poolCreatureDataMap.find(guid);
     if (itr == _poolCreatureDataMap.end())
         return nullptr;
 
@@ -1137,7 +1139,7 @@ CreatureData* MapPoolMgr::_getCreatureData(ObjectGuid guid)
 
 GameObjectData* MapPoolMgr::_getGameObjectData(ObjectGuid guid)
 {
-    auto itr = _poolGameObjectDataMap.find(guid);
+    const auto itr = _poolGameObjectDataMap.find(guid);
     if (itr == _poolGameObjectDataMap.end())
         return nullptr;
 
@@ -1158,17 +1160,17 @@ bool MapPoolMgr::SpawnCreature(uint32 poolId, uint32 entry, uint32 pointId)
 
     MapPoolCreature* cEntry = _getSpawnCreature(pool, entry);
 
-    GridCoord grid = Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY);
+    const GridCoord grid = Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY);
     if (ownerMap->IsGridLoaded(grid.GetId()))
     {
-        CreatureData* newData = new CreatureData();
+        auto* newData = new CreatureData();
         if (!GenerateData(pool, cEntry, spawnPoint, newData))
         {
             delete newData;
             return false;
         }
 
-        Creature* newCreature = new Creature();
+        auto* newCreature = new Creature();
         if (!newCreature->LoadFromDB(0, ownerMap, true, true, newData))
         {
             delete newCreature;
@@ -1203,17 +1205,17 @@ bool MapPoolMgr::SpawnGameObject(uint32 poolId, uint32 entry, uint32 pointId)
 
     MapPoolGameObject* goEntry = _getSpawnGameObject(pool, entry);
 
-    GridCoord grid = Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY);
+    const GridCoord grid = Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY);
     if (ownerMap->IsGridLoaded(grid.GetId()))
     {
-        GameObjectData* newData = new GameObjectData();
+        auto* newData = new GameObjectData();
         if (!GenerateData(pool, goEntry, spawnPoint, newData))
         {
             delete newData;
             return false;
         }
 
-        GameObject* newGameObject = new GameObject();
+        auto* newGameObject = new GameObject();
         if (!newGameObject->LoadFromDB(0, ownerMap, true, true, newData))
         {
             delete newGameObject;
@@ -1277,9 +1279,9 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPo
             point->creatureOverride && point->creatureOverride->npcFlag ? point->creatureOverride->npcFlag :
             cEntry->npcFlag;
 
-        data->spawndist = odata && odata->spawnDist ? odata->spawnDist :
-            cEntry->overrideData && cEntry->overrideData->spawnDist ? cEntry->overrideData->spawnDist :
-            point->creatureOverride && point->creatureOverride->spawnDist ? point->creatureOverride->spawnDist :
+        data->wander_distance = odata && odata->wander_distance ? odata->wander_distance :
+            cEntry->overrideData && cEntry->overrideData->wander_distance ? cEntry->overrideData->wander_distance :
+            point->creatureOverride && point->creatureOverride->wander_distance ? point->creatureOverride->wander_distance :
             pool->poolData.spawnDist;
 
         data->phaseMask = odata && odata->phaseMask ? odata->phaseMask :
@@ -1292,16 +1294,12 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPo
             point->creatureOverride && point->creatureOverride->spawnMask ? point->creatureOverride->spawnMask :
             pool->poolData.spawnMask;
 
-        std::string scriptName = odata && odata->scriptName.empty() ? odata->scriptName :
-            cEntry->overrideData && cEntry->overrideData->scriptName.empty() ? cEntry->overrideData->scriptName :
-            point->creatureOverride && point->creatureOverride->scriptName.empty() ? point->creatureOverride->scriptName : "";
+        const std::string scriptName = odata && odata->scriptName.empty() ? odata->scriptName :
+                                           cEntry->overrideData && cEntry->overrideData->scriptName.empty() ? cEntry->overrideData->scriptName :
+                                           point->creatureOverride && point->creatureOverride->scriptName.empty() ? point->creatureOverride->scriptName : "";
         data->scriptId = sObjectMgr->GetScriptId(scriptName);
 
-        data->spawnPoint = WorldLocation(ownerMapId, point->positionX, point->positionY, point->positionZ, point->positionO);
-        data->spawnId = 0;
-        data->id = cEntry->entry;
-        data->dbData = true;
-        data->spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();  // @ToDo: Make a proper default group
+        GenerateData(cEntry, point, data);
         return true;
     }
 
@@ -1310,7 +1308,7 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolCreature* cEntry, MapPo
 
 bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, MapPoolSpawnPoint* point, GameObjectData* data)
 {
-    if (GameObjectTemplate const* goInfo = sObjectMgr->GetGameObjectTemplate(goEntry->entry))
+    if (sObjectMgr->GetGameObjectTemplate(goEntry->entry) != nullptr)
     {
         MapPoolGameObjectOverride const* odata = GetGameObjectOverride(point->pointId, goEntry->entry);
         // This is so messy, but should handle priority specific override, creature override, spawnpoint override, pool data
@@ -1319,10 +1317,14 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, Ma
             point->gameObjectOverride && point->gameObjectOverride->animProgress ? point->gameObjectOverride->animProgress :
             goEntry->animProgress;
 
-        data->goState = GOState(odata && odata->state ? odata->state :
-            goEntry->overrideData && goEntry->overrideData->state ? goEntry->overrideData->state :
-            point->gameObjectOverride && point->gameObjectOverride->state ? point->gameObjectOverride->state :
-            goEntry->state);
+        data->goState = static_cast<GOState>(odata && odata->state
+                                                 ? odata->state
+                                                 : goEntry->overrideData && goEntry->overrideData->state
+                                                 ? goEntry->overrideData->state
+                                                 : point->gameObjectOverride && point->
+                                                 gameObjectOverride->state
+                                                 ? point->gameObjectOverride->state
+                                                 : goEntry->state);
 
         data->phaseMask = odata && odata->phaseMask ? odata->phaseMask :
             goEntry->overrideData && goEntry->overrideData->phaseMask ? goEntry->overrideData->phaseMask :
@@ -1334,11 +1336,12 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, Ma
             point->gameObjectOverride && point->gameObjectOverride->spawnMask ? point->gameObjectOverride->spawnMask :
             pool->poolData.spawnMask;
 
-        std::string scriptName = odata && odata->scriptName.empty() ? odata->scriptName :
-            goEntry->overrideData && goEntry->overrideData->scriptName.empty() ? goEntry->overrideData->scriptName :
-            point->gameObjectOverride && point->gameObjectOverride->scriptName.empty() ? point->gameObjectOverride->scriptName : "";
+        const std::string scriptName = odata && odata->scriptName.empty() ? odata->scriptName :
+                                           goEntry->overrideData && goEntry->overrideData->scriptName.empty() ? goEntry->overrideData->scriptName :
+                                           point->gameObjectOverride && point->gameObjectOverride->scriptName.empty() ? point->gameObjectOverride->scriptName : "";
 
         GenerateData(goEntry, point, data);
+        data->spawntimesecs = 300;      // This isn't actually used to respawn
         data->scriptId = sObjectMgr->GetScriptId(scriptName);
         data->artKit = 0;
         data->goState = GO_STATE_READY;
@@ -1349,13 +1352,12 @@ bool MapPoolMgr::GenerateData(MapPoolEntry* pool, MapPoolGameObject* goEntry, Ma
     return false;
 }
 
-void MapPoolMgr::GenerateData(MapPoolItem* objEntry, MapPoolSpawnPoint* point, SpawnData* data)
+void MapPoolMgr::GenerateData(MapPoolItem* objEntry, MapPoolSpawnPoint* point, SpawnData* data) const
 {
-        data->spawnPoint = WorldLocation(ownerMapId, point->positionX, point->positionY, point->positionZ, point->positionO);
+        data->spawnPoint = WorldLocation(ownerMapId, point->positionX, point->positionY, point->positionZ, point->positionO).GetPosition();
         data->spawnId = 0;
         data->id = objEntry->entry;
         data->dbData = true;
-        data->spawntimesecs = 300;      // This isn't actually used to respawn
         data->spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();  // @ToDo: Make a proper default group
 }
 
@@ -1368,14 +1370,14 @@ bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
     {
         if (MapPoolCreature* cEntry = spawnPoint->currentItem->ToCreatureItem())
         {
-            CreatureData* newData = new CreatureData();
+            auto* newData = new CreatureData();
             if (!GenerateData(pool, cEntry, spawnPoint, newData))
             {
                 delete newData;
                 return false;
             }
 
-            Creature* newCreature = new Creature();
+            auto* newCreature = new Creature();
             if (!newCreature->LoadFromDB(0, ownerMap, true, true, newData))
             {
                 delete newCreature;
@@ -1389,14 +1391,14 @@ bool MapPoolMgr::SpawnPendingPoint(MapPoolSpawnPoint* spawnPoint)
         }
         else if (MapPoolGameObject* goEntry = spawnPoint->currentItem->ToGameObjectItem())
         {
-            GameObjectData* newData = new GameObjectData();
+            auto* newData = new GameObjectData();
             if (!GenerateData(pool, goEntry, spawnPoint, newData))
             {
                 delete newData;
                 return false;
             }
 
-            GameObject* newGameObject = new GameObject();
+            auto* newGameObject = new GameObject();
             if (!newGameObject->LoadFromDB(0, ownerMap, true, true, newData))
             {
                 delete newGameObject;
@@ -1450,7 +1452,7 @@ void MapPoolMgr::UpdatePoolDefaults(MapPoolEntry* pool)
             poolData->spawnMask = parentData->spawnMask;
     }
 
-    if (pool->GetChildPools()->size() == 0)
+    if (pool->GetChildPools()->empty())
         return;
 
     // Handle next level down

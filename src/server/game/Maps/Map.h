@@ -849,20 +849,19 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         bool GetPoolRespawnInfo(uint32 poolId, std::vector<RespawnInfo*>& ri);
         RespawnInfo* GetFirstPoolRespawn(uint32 poolId);
         void RemoveRespawnTime(std::vector<RespawnInfo*>& respawnData, CharacterDatabaseTransaction dbTrans = nullptr);
-        void RemoveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, CharacterDatabaseTransaction dbTrans = nullptr, bool alwaysDeleteFromDB = false)
+        void RemoveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 poolId = 0, CharacterDatabaseTransaction dbTrans = nullptr, bool alwaysDeleteFromDB = false)
         {
             if (RespawnInfo* info = GetRespawnInfo(type, spawnId))
                 DeleteRespawnInfo(info, dbTrans);
             // Some callers might need to make sure the database doesn't contain any respawn time
             else if (alwaysDeleteFromDB)
-                DeleteRespawnInfoFromDB(type, spawnId, 0, dbTrans);
+                DeleteRespawnInfoFromDB(type, spawnId, poolId, dbTrans);
         }
         size_t DespawnAll(SpawnObjectType type, ObjectGuid::LowType spawnId);
 
         bool ShouldBeSpawnedOnGridLoad(SpawnObjectType type, ObjectGuid::LowType spawnId) const;
         template <typename T> bool ShouldBeSpawnedOnGridLoad(ObjectGuid::LowType spawnId) const { return ShouldBeSpawnedOnGridLoad(SpawnData::TypeFor<T>, spawnId); }
 
-        void RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, CharacterDatabaseTransaction dbTrans = nullptr) const;
         void RemovePoolRespawns(std::vector<RespawnInfo*>& respawnData, uint32 poolId, CharacterDatabaseTransaction dbTrans = nullptr);
 
         SpawnGroupTemplateData const* GetSpawnGroupData(uint32 groupId) const;

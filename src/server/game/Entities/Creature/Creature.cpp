@@ -1786,7 +1786,7 @@ bool Creature::hasInvolvedQuest(uint32 quest_id) const
                 toUnload.push_back(pair.second);
             for (Creature* creature : toUnload)
                 map->AddObjectToRemoveList(creature);
-            map->RemoveRespawnTime(SPAWN_TYPE_CREATURE, spawnId, charTrans);
+            map->RemoveRespawnTime(SPAWN_TYPE_CREATURE, spawnId, 0, charTrans);
         }
     );
 
@@ -2457,12 +2457,12 @@ void Creature::SaveRespawnTime(uint32 forceDelay)
     {
         // For pools, we use pool counter instead of spawnId
         thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : GameTime::GetGameTime() + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
-        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), 0, thisRespawnTime, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), nullptr, false, poolId, pointId);
+        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), GetEntry(), thisRespawnTime, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId(), nullptr, false, poolId, pointId);
     }
     else
     {
         thisRespawnTime = forceDelay ? GameTime::GetGameTime() + forceDelay : m_respawnTime;
-        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, 0, 0, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId());
+        GetMap()->SaveRespawnTime(SPAWN_TYPE_CREATURE, m_spawnId, GetEntry(), thisRespawnTime, Trinity::ComputeGridCoord(GetHomePosition().GetPositionX(), GetHomePosition().GetPositionY()).GetId());
     }
 }
 

@@ -22,150 +22,169 @@
 #include "Log.h"
 #include "MapManager.h"
 #include "MapPoolMgr.h"
-#include "Player.h"
 #include "RBAC.h"
 
-// temporary hack until includes are sorted out (don't want to pull in Windows.h)
-#ifdef GetClassName
-#undef GetClassName
-#endif
+using namespace Trinity::ChatCommands;
 
 class pool_commandscript : public CommandScript
 {
 public:
     pool_commandscript() : CommandScript("pool_commandscript") { }
 
-    std::vector<ChatCommand> GetCommands() const override
+    ChatCommandTable GetCommands() const override
     {
-        static std::vector<ChatCommand> poolCommandTable =
+        static ChatCommandTable poolCommandTable =
         {
-            { "dump",          rbac::RBAC_PERM_COMMAND_POOL_DUMP,                    true,  &HandleDebugPoolDumpCommand,    "" },
-            { "respawn",       rbac::RBAC_PERM_COMMAND_POOL_RESPAWN,                 true,  &HandleDebugPoolRespawnCommand, "" },
-            { "despawn",       rbac::RBAC_PERM_COMMAND_POOL_DESPAWN,                 true,  &HandleDebugPoolDespawnCommand, "" },
-            { "reseed",        rbac::RBAC_PERM_COMMAND_POOL_RESEED,                  true,  &HandleDebugPoolReseedCommand,  "" },
-            { "list",          rbac::RBAC_PERM_COMMAND_POOL_LIST,                    true,  &HandleDebugPoolListCommand,    "" },
+            { "dump",       HandleDebugPoolDumpCommand,    rbac::RBAC_PERM_COMMAND_POOL_DUMP,    Console::Yes },
+            { "respawn",    HandleDebugPoolRespawnCommand, rbac::RBAC_PERM_COMMAND_POOL_RESPAWN, Console::Yes },
+            { "despawn",    HandleDebugPoolDespawnCommand, rbac::RBAC_PERM_COMMAND_POOL_DESPAWN, Console::Yes },
+            { "reseed",     HandleDebugPoolReseedCommand,  rbac::RBAC_PERM_COMMAND_POOL_RESEED,  Console::Yes },
+            { "list",       HandleDebugPoolListCommand,    rbac::RBAC_PERM_COMMAND_POOL_LIST,    Console::Yes },
         };
 
-        static std::vector<ChatCommand> commandTable =
+        static ChatCommandTable commandTable =
         {
-            { "pool", rbac::RBAC_PERM_COMMAND_POOL, true, nullptr, "", poolCommandTable },
+            { "pool", poolCommandTable },
         };
-
         return commandTable;
     }
 
-    static bool HandleDebugPoolRespawnCommand(ChatHandler* handler, char const* args)
+    static bool HandleDebugPoolRespawnCommand(ChatHandler* handler, Optional<uint32> mapId, Optional<uint32> poolId)
     {
-        if (!*args)
+        if (!mapId.has_value())
+        {
+            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, 0);
+            handler->SetSentErrorMessage(true);
             return false;
-
-        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
-        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
-        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
-        if (mapId == -1)
-        {
-            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, mapIdStr);
-            return true;
         }
-        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
-        if (poolId == -1)
+        if (!poolId.has_value())
         {
-            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, poolIdStr);
+            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, 0);
+            handler->SetSentErrorMessage(true);
+            return false;
         }
 
-        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId.value()))
         {
             if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
             {
-                uint32 spawns = poolMgr->RespawnPool(poolId);
-                handler->PSendSysMessage(LANG_POOL_RESPAWNED_ENTRIES, poolIdStr, spawns);
-                return true;
+                if (poolMgr->GetPool(poolId.value()) != nullptr)
+                {
+                    uint32 spawns = poolMgr->RespawnPool(poolId.value());
+                    handler->PSendSysMessage(LANG_POOL_RESPAWNED_ENTRIES, poolId.value(), spawns);
+                    return true;
+                }
+
+                handler->PSendSysMessage(LANG_POOL_NOTFOUND_IN_MAP, poolId.value(), mapId.value());
+                handler->SetSentErrorMessage(true);
+                return false;
             }
+        }
+        else
+        {
+            handler->PSendSysMessage(LANG_POOL_BASEMAP_NOTFOUND, mapId.value());
+            handler->SetSentErrorMessage(true);
+            return false;
         }
         return false;
     }
 
-    static bool HandleDebugPoolDespawnCommand(ChatHandler* handler, char const* args)
+    static bool HandleDebugPoolDespawnCommand(ChatHandler* handler, Optional<uint32> mapId, Optional<uint32> poolId)
     {
-        if (!*args)
+        if (!mapId.has_value())
+        {
+            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, 0);
+            handler->SetSentErrorMessage(true);
             return false;
-
-        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
-        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
-        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
-        if (mapId == -1)
-        {
-            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, mapIdStr);
-            return true;
         }
-        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
-        if (poolId == -1)
+        if (!poolId.has_value())
         {
-            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, poolIdStr);
+            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, 0);
+            handler->SetSentErrorMessage(true);
+            return false;
         }
 
-        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId.value()))
         {
             if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
             {
-                uint32 spawns = poolMgr->DespawnPool(poolId);
-                handler->PSendSysMessage(LANG_POOL_DESPAWNED_ENTRIES, poolIdStr, spawns);
-                return true;
+                if (poolMgr->GetPool(poolId.value()) != nullptr)
+                {
+                    uint32 spawns = poolMgr->DespawnPool(poolId.value());
+                    handler->PSendSysMessage(LANG_POOL_DESPAWNED_ENTRIES, poolId.value(), spawns);
+                    return true;
+                }
+
+                handler->PSendSysMessage(LANG_POOL_NOTFOUND_IN_MAP, poolId.value(), mapId.value());
+                handler->SetSentErrorMessage(true);
+                return false;
             }
+        }
+        else
+        {
+            handler->PSendSysMessage(LANG_POOL_BASEMAP_NOTFOUND, mapId.value());
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        return false;
+    }
+
+    static bool HandleDebugPoolReseedCommand(ChatHandler* handler, Optional<uint32> mapId, Optional<uint32> poolId)
+    {
+        if (!mapId.has_value())
+        {
+            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, 0);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+        if (!poolId.has_value())
+        {
+            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, 0);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId.value()))
+        {
+            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
+            {
+                if (poolMgr->GetPool(poolId.value()) != nullptr)
+                {
+                    uint32 spawns = poolMgr->ReseedPool(poolId.value());
+                    handler->PSendSysMessage(LANG_POOL_RESEEDED_ENTRIES, poolId.value(), spawns);
+                    return true;
+                }
+
+                handler->PSendSysMessage(LANG_POOL_NOTFOUND_IN_MAP, poolId.value(), mapId.value());
+                handler->SetSentErrorMessage(true);
+                return false;
+            }
+        }
+        else
+        {
+            handler->PSendSysMessage(LANG_POOL_BASEMAP_NOTFOUND, mapId.value());
+            handler->SetSentErrorMessage(true);
+            return false;
         }
         return false;
     }
 
-    static bool HandleDebugPoolReseedCommand(ChatHandler* handler, char const* args)
+    static bool HandleDebugPoolListCommand(ChatHandler* handler, Optional<uint32> mapId)
     {
-        if (!*args)
+        if (!mapId.has_value())
+        {
+            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, 0);
+            handler->SetSentErrorMessage(true);
             return false;
-
-        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
-        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
-        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
-        if (mapId == -1)
-        {
-            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, mapIdStr);
-            return true;
-        }
-        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
-        if (poolId == -1)
-        {
-            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, poolIdStr);
         }
 
-        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
-        {
-            if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
-            {
-                uint32 spawns = poolMgr->ReseedPool(poolId);
-                handler->PSendSysMessage(LANG_POOL_RESEEDED_ENTRIES, poolIdStr, spawns);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    static bool HandleDebugPoolListCommand(ChatHandler* handler, char const* args)
-    {
-        if (!*args)
-            return false;
-
-        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
-        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
-        if (mapId == -1)
-        {
-            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, mapIdStr);
-            return true;
-        }
-
-        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId.value()))
         {
             if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
             {
                 std::vector<MapPoolEntry const*> rootPools = poolMgr->GetRootPools();
-                handler->PSendSysMessage(LANG_POOL_LIST_ROOT_POOLS_MAP, mapIdStr);
+                handler->PSendSysMessage(LANG_POOL_LIST_ROOT_POOLS_MAP, mapId.value());
                 for (MapPoolEntry const* pool : rootPools)
                 {
                     MapPoolTemplate const* data = pool->GetPoolData();
@@ -174,33 +193,35 @@ public:
                 return true;
             }
         }
+        else
+        {
+            handler->PSendSysMessage(LANG_POOL_BASEMAP_NOTFOUND, mapId.value());
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
         return false;
     }
 
-    static bool HandleDebugPoolDumpCommand(ChatHandler* handler, char const* args)
+    static bool HandleDebugPoolDumpCommand(ChatHandler* handler, Optional<uint32> mapId, Optional<uint32> poolId)
     {
-        if (!*args)
+        if (!mapId.has_value())
+        {
+            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, 0);
+            handler->SetSentErrorMessage(true);
             return false;
-
-        char* mapIdStr = args ? strtok((char*)args, " ") : nullptr;
-        char* poolIdStr = args ? strtok(nullptr, " ") : nullptr;
-        int32 mapId = mapIdStr ? atoi(mapIdStr) : -1;
-        if (mapId == -1)
-        {
-            handler->PSendSysMessage(LANG_POOL_INVALID_MAP_ID, mapIdStr);
-            return true;
         }
-        int32 poolId = poolIdStr ? atoi(poolIdStr) : -1;
-        if (poolId == -1)
+        if (!poolId.has_value())
         {
-            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, poolIdStr);
+            handler->PSendSysMessage(LANG_POOL_INVALID_POOL_ID, 0);
+            handler->SetSentErrorMessage(true);
+            return false;
         }
 
-        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId))
+        if (Map* map = sMapMgr->FindBaseNonInstanceMap(mapId.value()))
         {
             if (MapPoolMgr* poolMgr = map->GetMapPoolMgr())
             {
-                if (MapPoolEntry const* pool = poolMgr->GetPool(poolId))
+                if (MapPoolEntry const* pool = poolMgr->GetPool(poolId.value()))
                 {
                     MapPoolEntry const* rootPool = pool->GetParentPool() ? pool->GetRootPool() : pool;
                     if (rootPool != pool)
@@ -210,23 +231,15 @@ public:
                     DumpPoolRecursive(handler, rootPool);
                     return true;
                 }
-                else
-                {
-                    handler->PSendSysMessage(LANG_POOL_NOTFOUND_IN_MAP, poolId, mapId);
-                    return true;
-                }
-            }
-            else
-            {
+
+                handler->PSendSysMessage(LANG_POOL_NOTFOUND_IN_MAP, poolId.value(), mapId.value());
                 return true;
             }
 
-        }
-        else
-        {
-            handler->PSendSysMessage(LANG_POOL_BASEMAP_NOTFOUND, mapId);
             return true;
         }
+        handler->PSendSysMessage(LANG_POOL_BASEMAP_NOTFOUND, mapId.value());
+        return true;
     }
 
     static void DumpPoolRecursive(ChatHandler* handler, MapPoolEntry const* pool)
@@ -248,7 +261,7 @@ public:
                     pool->GetPoolData()->description.c_str(), pool->GetPoolData()->minLimit, pool->GetPoolData()->maxLimit, pool->GetChance(), pool->GetSpawnCount(),
                     pool->GetSpawnable(true), pool->GetSpawnable());
 
-        if (pool->GetChildPools()->size() > 0)
+        if (!pool->GetChildPools()->empty())
         {
             // Not a leaf node, recurse
             for (MapPoolEntry* childPool : *pool->GetChildPools())
@@ -259,7 +272,7 @@ public:
         else
         {
             // Leaf node, dump used spawn points
-            for (auto spawn : *pool->GetSpawns())
+            for (auto* spawn : *pool->GetSpawns())
             {
                 if (WorldObject* obj = spawn->currentObject)
                 {

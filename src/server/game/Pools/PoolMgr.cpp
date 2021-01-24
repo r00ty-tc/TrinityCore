@@ -189,7 +189,7 @@ void PoolGroup<Creature>::Despawn1Object(ObjectGuid::LowType guid, bool alwaysDe
             }
 
             if (alwaysDeleteRespawnTime)
-                map->RemoveRespawnTime(SpawnObjectType::SPAWN_TYPE_CREATURE, guid, nullptr, true);
+                map->RemoveRespawnTime(SpawnObjectType::SPAWN_TYPE_CREATURE, guid, 0, nullptr, true);
         }
     }
 }
@@ -218,7 +218,7 @@ void PoolGroup<GameObject>::Despawn1Object(ObjectGuid::LowType guid, bool always
             }
 
             if (alwaysDeleteRespawnTime)
-                map->RemoveRespawnTime(SpawnObjectType::SPAWN_TYPE_GAMEOBJECT, guid, nullptr, true);
+                map->RemoveRespawnTime(SpawnObjectType::SPAWN_TYPE_GAMEOBJECT, guid, 0, nullptr, true);
         }
     }
 }
@@ -403,7 +403,7 @@ void PoolGroup<Creature>::RemoveRespawnTimeFromDB(ObjectGuid::LowType guid)
         Map* map = sMapMgr->CreateBaseMap(data->mapId);
         if (!map->Instanceable())
         {
-            map->RemoveRespawnTime(SPAWN_TYPE_CREATURE, guid, nullptr, true);
+            map->RemoveRespawnTime(SPAWN_TYPE_CREATURE, guid, 0,nullptr, true);
         }
     }
 }
@@ -416,7 +416,7 @@ void PoolGroup<GameObject>::RemoveRespawnTimeFromDB(ObjectGuid::LowType guid)
         Map* map = sMapMgr->CreateBaseMap(data->mapId);
         if (!map->Instanceable())
         {
-            map->RemoveRespawnTime(SPAWN_TYPE_GAMEOBJECT, guid, nullptr, true);
+            map->RemoveRespawnTime(SPAWN_TYPE_GAMEOBJECT, guid, 0, nullptr, true);
         }
     }
 }

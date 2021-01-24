@@ -161,12 +161,12 @@ WHERE entry BETWEEN 5084 AND 5099;
 INSERT INTO `trinity_string`
 (`entry`, `content_default`)
 VALUES
-(5084, 'Invalid Map ID %s'),
-(5085, 'Invalid Pool ID %s'),
-(5086, 'Pool %s respawned %u entities'),
-(5087, 'Pool %s despawned %u entities'),
-(5088, 'Pool %s reseeded %u entities'),
-(5089, 'Listing root pools for map %s'),
+(5084, 'Invalid Map ID %u'),
+(5085, 'Invalid Pool ID %u'),
+(5086, 'Pool %u respawned %u entities'),
+(5087, 'Pool %u despawned %u entities'),
+(5088, 'Pool %u reseeded %u entities'),
+(5089, 'Listing root pools for map %u'),
 (5090, 'Pool %u (%s) Min/Max (%u/%u) Spawned (%u)'),
 (5091, 'Pool %u was not a root pool, using the root pool %u'),
 (5092, 'Dumping pool data, starting at root pool %u'),

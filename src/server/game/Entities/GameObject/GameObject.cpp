@@ -1134,7 +1134,7 @@ bool GameObject::LoadFromDB(ObjectGuid::LowType spawnId, Map* map, bool addToMap
                 toUnload.push_back(pair.second);
             for (GameObject* obj : toUnload)
                 map->AddObjectToRemoveList(obj);
-            map->RemoveRespawnTime(SPAWN_TYPE_GAMEOBJECT, spawnId, charTrans);
+            map->RemoveRespawnTime(SPAWN_TYPE_GAMEOBJECT, spawnId, 0, charTrans);
         }
     );
 
@@ -1253,7 +1253,7 @@ void GameObject::SaveRespawnTime(uint32 forceDelay)
         if (poolId != 0)
         {
             thisRespawnTime = forceDelay ? time(nullptr) + forceDelay : time(nullptr) + GetMap()->GetMapPoolMgr()->GenerateRespawnTime(this);
-            GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), 0, thisRespawnTime, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId(), nullptr, false, poolId, pointId);
+            GetMap()->SaveRespawnTime(SPAWN_TYPE_GAMEOBJECT, GetMap()->GetMapPoolMgr()->GetRespawnCounter(poolId), GetEntry(), thisRespawnTime, Trinity::ComputeGridCoord(GetPositionX(), GetPositionY()).GetId(), nullptr, false, poolId, pointId);
         }
         else
         {

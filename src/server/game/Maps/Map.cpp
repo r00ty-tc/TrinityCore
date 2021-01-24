@@ -3322,24 +3322,6 @@ void Map::RemovePoolRespawns(std::vector<RespawnInfo*>& respawnData, uint32 pool
         CharacterDatabase.CommitTransaction(trans);
 }
 
-void Map::RemoveRespawnTime(uint32 poolId, uint32 spawnCounter, CharacterDatabaseTransaction dbTrans) const
-{
-    if (MapPoolEntry const* pool = sMapPoolMgr->GetPool(poolId))
-    {
-        CharacterDatabaseTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
-        CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_RESPAWN);
-
-        stmt->setUInt32(0, spawnCounter);
-        stmt->setUInt16(1, GetId());
-        stmt->setUInt32(2, GetInstanceId());
-        stmt->setUInt32(3, poolId);
-
-        CharacterDatabase.ExecuteOrAppend(trans, stmt);
-        if (!dbTrans)
-            CharacterDatabase.CommitTransaction(trans);
-    }
-}
-
 void Map::RemoveRespawnTime(RespawnVector& respawnData, CharacterDatabaseTransaction dbTrans)
 {
     CharacterDatabaseTransaction trans = dbTrans ? dbTrans : CharacterDatabase.BeginTransaction();
@@ -3358,25 +3340,13 @@ void Map::ProcessRespawns()
         if (now < next->respawnTime) // done for this tick
             break;
 
-        if (uint32 poolId = sPoolMgr->IsPartOfAPool(next->type, next->spawnId)) // is this part of a pool?
-        { // if yes, respawn will be handled by (external) pooling logic, just delete the respawn time
-            // step 1: remove entry from maps to avoid it being reachable by outside logic
-            _respawnTimes.pop();
-            GetRespawnMapForType(next->type).erase(next->spawnId);
-
-            // step 2: tell pooling logic to do its thing
-            sPoolMgr->UpdatePool(poolId, next->type, next->spawnId);
-
-            // step 3: get rid of the actual entry
-            delete next;
-        }
-        else if (next->poolId)
+        if (next->poolId)
         {
             if (!GetMapPoolMgr()->SpawnPool(next->poolId, 1))
                 TC_LOG_ERROR("maps.pool", "[Map %u] Unable to spawn object for pool %u.", GetId(), next->poolId);
 
             auto bounds = _RespawnTimesByPoolId.equal_range(next->poolId);
-            for (auto itr = bounds.first; itr != bounds.second;++itr)
+            for (auto itr = bounds.first; itr != bounds.second; ++itr)
             {
                 if (itr->second == next)
                 {
@@ -3384,7 +3354,22 @@ void Map::ProcessRespawns()
                     break;
                 }
             }
-            DeleteRespawnInfo(next, false);
+            DeleteRespawnInfo(next);
+        }
+        else if (uint32 poolId = sPoolMgr->IsPartOfAPool(next->type, next->spawnId)) // is this part of a pool?
+        { // if yes, respawn will be handled by (external) pooling logic, just delete the respawn time
+            // step 1: remove entry from maps to avoid it being reachable by outside logic
+            _respawnTimes.pop();
+            GetRespawnMapForType(next->type).erase(next->spawnId);
+
+            // step 1a: Remove from DB (weird this isn't already done?)
+            DeleteRespawnInfoFromDB(next->type, next->spawnId);
+
+            // step 2: tell pooling logic to do its thing
+            sPoolMgr->UpdatePool(poolId, next->type, next->spawnId);
+
+            // step 3: get rid of the actual entry
+            delete next;
         }
         else if (CheckRespawn(next)) // see if we're allowed to respawn
         {
@@ -3392,6 +3377,9 @@ void Map::ProcessRespawns()
             // step 1: remove entry from maps to avoid it being reachable by outside logic
             _respawnTimes.pop();
             GetRespawnMapForType(next->type).erase(next->spawnId);
+
+            // step 1a: Remove from DB (weird this isn't already done?)
+            DeleteRespawnInfoFromDB(next->type, next->spawnId);
 
             // step 2: do the respawn, which involves external logic
             DoRespawn(next->type, next->spawnId, next->gridId);
@@ -4513,23 +4501,28 @@ void Map::UpdateIteratorBack(Player* player)
 void Map::SaveRespawnTime(SpawnObjectType type, ObjectGuid::LowType spawnId, uint32 entry, time_t respawnTime, uint32 gridId, CharacterDatabaseTransaction dbTrans, bool startup, uint32 poolId, uint32 lastSpawnPoint)
 {
     SpawnMetadata const* data = sObjectMgr->GetSpawnMetadata(type, spawnId);
-    if (!data)
+    if (!data && !poolId)
     {
         TC_LOG_ERROR("maps", "Map %u attempt to save respawn time for nonexistant spawnid (%u,%u).", GetId(), type, spawnId);
         return;
+    }
+    else if (data)
+    {
+        type = data->type;
+        spawnId = data->spawnId;
     }
 
     if (!respawnTime)
     {
         // Delete only
         if (!poolId)
-            RemoveRespawnTime(data->type, data->spawnId, dbTrans);
+            RemoveRespawnTime(type, spawnId, poolId, dbTrans);
         return;
     }
 
     RespawnInfo ri;
-    ri.type = data->type;
-    ri.spawnId = data->spawnId;
+    ri.type = type;
+    ri.spawnId = spawnId;
     ri.poolId = poolId;
     ri.lastPoolPointId = lastSpawnPoint;
     ri.entry = entry;
@@ -4553,8 +4546,9 @@ void Map::SaveRespawnInfoDB(RespawnInfo const& info, CharacterDatabaseTransactio
     stmt->setUInt32(1, info.poolId);
     stmt->setUInt32(2, info.spawnId);
     stmt->setUInt64(3, uint64(info.respawnTime));
-    stmt->setUInt16(4, GetId());
-    stmt->setUInt32(5, GetInstanceId());
+    stmt->setUInt64(4, info.lastPoolPointId);
+    stmt->setUInt16(5, GetId());
+    stmt->setUInt32(6, GetInstanceId());
     CharacterDatabase.ExecuteOrAppend(dbTrans, stmt);
 }
 
@@ -4572,22 +4566,28 @@ void Map::LoadRespawnTimes()
             uint32 poolId = fields[1].GetUInt32();
             ObjectGuid::LowType spawnId = fields[2].GetUInt32();
             uint64 respawnTime = fields[3].GetUInt64();
-            uint32 pointId = fields[4].GetUInt32();
+            const uint32 pointId = fields[4].GetUInt32();
 
             if (SpawnData::TypeHasData(type))
             {
-                if (poolId)
+                // Just remove it if it expired already
+                if (static_cast<time_t>(respawnTime) <= GameTime::GetGameTime())
+                {
+                    TC_LOG_INFO("maps", "Removing expired respawn for type %u with spawnId %u and poolId %u", static_cast<uint32>(type), spawnId, poolId);
+                    RemoveRespawnTime(type, spawnId, poolId, nullptr, true);
+                }
+                else if (poolId)
                 {
                     if (poolId != sMapPoolMgr->GetRootPoolId(poolId))
                     {
                         TC_LOG_ERROR("maps.pool", "Attempted to load respawn for pool %u, which is not the root pool %u ignored and removed", poolId, sMapPoolMgr->GetRootPoolId(poolId));
-                        RemoveRespawnTime(poolId, spawnId);
+                        RemoveRespawnTime(type, spawnId, poolId, nullptr, true);
                     }
                     else if (MapPoolSpawnPoint* spawnPoint = GetSpawnPoint(pointId))
                     {
                         // Not the best way to handle this, but need to keep spawn counter low
-                        RemoveRespawnTime(poolId, spawnId);
-                        SaveRespawnTime(SPAWN_TYPE_CREATURE, sMapPoolMgr->GetRespawnCounter(poolId), 0, time_t(respawnTime), Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), nullptr, true, poolId, pointId);
+                        RemoveRespawnTime(type, spawnId, poolId, nullptr, true);
+                        SaveRespawnTime(type, sMapPoolMgr->GetRespawnCounter(poolId), 0, static_cast<time_t>(respawnTime), Trinity::ComputeGridCoord(spawnPoint->positionX, spawnPoint->positionY).GetId(), nullptr, false, poolId, pointId);
                     }
                 }
                 else if (SpawnData const* data = sObjectMgr->GetSpawnData(type, spawnId))

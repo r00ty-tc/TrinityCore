@@ -1472,34 +1472,6 @@ LOCK TABLES `corpse` WRITE;
 UNLOCK TABLES;
 
 --
--- Table structure for table `creature_respawn`
---
-
-DROP TABLE IF EXISTS `creature_respawn`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `creature_respawn` (
-  `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier',
-  `respawnTime` bigint(20) unsigned NOT NULL DEFAULT '0',
-  `mapId` smallint(10) unsigned NOT NULL DEFAULT '0',
-  `instanceId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Instance Identifier',
-  `poolId` mediumint(8) unsigned NOT NULL DEFAULT '0',
-  `pointId` int(10) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`guid`, `instanceId`, `poolId`),
-  KEY `idx_instance` (`instanceId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Grid Loading System';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `creature_respawn`
---
-
-LOCK TABLES `creature_respawn` WRITE;
-/*!40000 ALTER TABLE `creature_respawn` DISABLE KEYS */;
-/*!40000 ALTER TABLE `creature_respawn` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `game_event_condition_save`
 --
 
@@ -1545,34 +1517,6 @@ CREATE TABLE `game_event_save` (
 LOCK TABLES `game_event_save` WRITE;
 /*!40000 ALTER TABLE `game_event_save` DISABLE KEYS */;
 /*!40000 ALTER TABLE `game_event_save` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `gameobject_respawn`
---
-
-DROP TABLE IF EXISTS `gameobject_respawn`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `gameobject_respawn` (
-  `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier',
-  `respawnTime` bigint(20) unsigned NOT NULL DEFAULT '0',
-  `mapId` smallint(10) unsigned NOT NULL DEFAULT '0',
-  `instanceId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Instance Identifier',
-  `poolId` MEDIUMINT(8) UNSIGNED NOT NULL DEFAULT '0',
-  `pointId` INT(10) UNSIGNED NOT NULL DEFAULT '0',
-  PRIMARY KEY (`guid`, `instanceId`, `poolId`),
-  KEY `idx_instance` (`instanceId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Grid Loading System';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `gameobject_respawn`
---
-
-LOCK TABLES `gameobject_respawn` WRITE;
-/*!40000 ALTER TABLE `gameobject_respawn` DISABLE KEYS */;
-/*!40000 ALTER TABLE `gameobject_respawn` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
