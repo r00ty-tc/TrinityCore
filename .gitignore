@@ -23,3 +23,8 @@ nbproject/*
 cmake-build-*/
 .vs
 *.user
+*.code-workspace
+/contrib/poolgen/poolgen.conf
+/PoolTestData.png
+/PoolTestData.uxf
+/compile_commands.json
