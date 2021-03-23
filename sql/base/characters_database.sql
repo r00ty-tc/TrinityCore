@@ -2557,11 +2557,13 @@ DROP TABLE IF EXISTS `respawn`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `respawn` (
   `type` smallint(10) unsigned NOT NULL,
+  `poolId` mediumint(8) unsigned NOT NULL DEFAULT '0',
   `spawnId` int(10) unsigned NOT NULL,
   `respawnTime` bigint(20) unsigned NOT NULL,
   `mapId` smallint(10) unsigned NOT NULL,
   `instanceId` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`type`,`spawnId`,`instanceId`),
+  `pointId` int(10) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`type`,`poolId`,`spawnId`,`instanceId`),
   KEY `idx_instance` (`instanceId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Stored respawn times';
 /*!40101 SET character_set_client = @saved_cs_client */;
